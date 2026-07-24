@@ -2119,6 +2119,273 @@
       .table-dialog { top: 48%; width: calc(100% - 24px); }
     }
 
+
+    /* Desktop viewport fit: keep the full game visible without page scrolling. */
+    @media (min-width: 761px) {
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .app {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+        grid-template-rows: 66px minmax(0, 1fr);
+      }
+
+      .topbar {
+        position: relative;
+        top: 0;
+        height: 66px;
+        min-height: 66px;
+        padding: 6px 14px;
+      }
+
+      .brand {
+        min-width: 220px;
+        gap: 10px;
+      }
+
+      .brand-mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 13px;
+        font-size: 30px;
+      }
+
+      .brand p {
+        margin-top: 3px;
+        font-size: 12px;
+      }
+
+      .topbar-last-trick {
+        min-height: 50px;
+        padding-block: 3px;
+      }
+
+      .game-layout {
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 9px;
+        padding: 8px 11px 9px;
+      }
+
+      .game-sidebar {
+        min-height: 0;
+        gap: 7px;
+        overflow: hidden;
+      }
+
+      .sidebar-heading {
+        padding: 7px 10px 6px;
+        font-size: 11px;
+      }
+
+      .trump-display {
+        min-height: 49px;
+        gap: 4px;
+        padding: 6px 8px 7px;
+        font-size: 12px;
+      }
+
+      .trump-display .trump-dot {
+        width: 18px;
+        height: 18px;
+      }
+
+      .bid-winner-display {
+        min-height: 54px;
+        padding: 7px 9px;
+      }
+
+      .sidebar-scoreboard .team-score {
+        padding: 6px 9px;
+      }
+
+      .sidebar-scoreboard .score-value {
+        font-size: 21px;
+      }
+
+      .sidebar-scoreboard .score-center {
+        padding: 6px 7px;
+      }
+
+      .sidebar-actions {
+        gap: 6px;
+      }
+
+      .sidebar-actions .btn {
+        min-height: 39px;
+        padding: 6px 9px;
+        font-size: 12px;
+      }
+
+      .sidebar-actions .sidebar-go-down {
+        min-height: 30px;
+        font-size: 10px;
+      }
+
+      .game-main {
+        min-height: 0;
+        overflow: hidden;
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 7px;
+      }
+
+      .table-shell {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        max-height: none;
+        border-width: 8px;
+        border-radius: 34px;
+      }
+
+      .player.north {
+        top: 13px;
+      }
+
+      .player.west,
+      .player.east {
+        top: 43%;
+      }
+
+      .player.south {
+        bottom: 118px;
+      }
+
+      .trick-area {
+        top: 46%;
+        height: clamp(215px, 32vh, 320px);
+      }
+
+      .hand-zone {
+        height: 116px;
+        bottom: 4px;
+      }
+
+      .hand {
+        padding-top: 14px;
+      }
+
+      .control-panel {
+        min-height: 54px;
+        padding: 6px 10px;
+        border-radius: 14px;
+      }
+
+      .game-controls {
+        gap: 7px;
+      }
+
+      .game-controls .btn {
+        min-width: 96px;
+        min-height: 38px;
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+
+      .stats-ticker {
+        display: none !important;
+      }
+    }
+
+    @media (min-width: 761px) and (max-height: 720px) {
+      .app {
+        grid-template-rows: 58px minmax(0, 1fr);
+      }
+
+      .topbar {
+        height: 58px;
+        min-height: 58px;
+        padding-block: 4px;
+      }
+
+      .brand-mark {
+        width: 42px;
+        height: 42px;
+        font-size: 27px;
+      }
+
+      .brand p {
+        display: none;
+      }
+
+      .topbar-last-trick {
+        min-height: 44px;
+        transform: scale(.92);
+        transform-origin: center;
+      }
+
+      .game-layout {
+        padding-block: 6px;
+      }
+
+      .game-sidebar {
+        gap: 5px;
+      }
+
+      .sidebar-heading {
+        padding-block: 5px;
+      }
+
+      .trump-display {
+        min-height: 41px;
+        padding-block: 4px;
+      }
+
+      .bid-winner-display {
+        min-height: 45px;
+        padding-block: 5px;
+      }
+
+      .sidebar-scoreboard .team-score,
+      .sidebar-scoreboard .score-center {
+        padding-block: 4px;
+      }
+
+      .sidebar-actions .btn {
+        min-height: 34px;
+      }
+
+      .player {
+        padding: 6px 8px;
+      }
+
+      .player.north {
+        top: 8px;
+      }
+
+      .player.south {
+        bottom: 105px;
+      }
+
+      .trick-area {
+        top: 45%;
+        height: clamp(195px, 30vh, 270px);
+      }
+
+      .hand-zone {
+        height: 104px;
+      }
+
+      .control-panel {
+        min-height: 47px;
+        padding-block: 4px;
+      }
+
+      .game-controls .btn {
+        min-height: 34px;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -2138,7 +2405,7 @@
         </div>
       </section>
       <div class="top-actions">
-        <button class="btn" id="rotateButton" title="Rotate all four hands clockwise during bidding" disabled>↻ <span>Rotate Hands</span></button>
+        <button class="btn" id="rotateButton" title="Rotate all four hands clockwise before taking the bid" disabled>↻ <span>Rotate Hands</span></button>
       </div>
     </header>
 
@@ -2152,8 +2419,8 @@
           </div>
         </div>
 
-        <section class="bid-board sidebar-panel" aria-label="Winning bid">
-          <div class="sidebar-heading">Bid Winner</div>
+        <section class="bid-board sidebar-panel" aria-label="Bid">
+          <div class="sidebar-heading">Bid</div>
           <button class="bid-winner-display" id="bidWinnerDisplay" type="button" disabled>
             <span id="bidWinnerName">No bid</span>
             <strong id="bidWinnerValue">—</strong>
@@ -2289,7 +2556,7 @@
     const TEAM_OF = [0, 1, 0, 1];
     const POSITIONS = ["south", "west", "north", "east"];
 
-    const SETTINGS_VERSION = 11;
+    const SETTINGS_VERSION = 12;
     const GAME_SAVE_VERSION = 1;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
     const DEFAULT_SETTINGS = {
@@ -2302,6 +2569,7 @@
       botSpeed: "normal",
       theme: "classic",
       soundEnabled: true,
+      showStats: true,
       userName: "You",
       botNames: ["Mara", "Cal", "June"]
     };
@@ -2426,7 +2694,7 @@
         const saved = JSON.parse(localStorage.getItem("rookPartnershipSettings") || "null");
         if (!saved) return structuredClone(DEFAULT_SETTINGS);
         let savedBidStart = Number.isFinite(Number(saved.bidStart))
-          ? clamp(Math.round(Number(saved.bidStart) / 5) * 5, 100, 200)
+          ? normalizeBidValue(saved.bidStart, 100)
           : DEFAULT_SETTINGS.bidStart;
         if (Number(saved.settingsVersion || 0) < SETTINGS_VERSION && savedBidStart === 140) {
           savedBidStart = DEFAULT_SETTINGS.bidStart;
@@ -2443,6 +2711,7 @@
           botSpeed: ["slow", "normal", "fast"].includes(saved.botSpeed) ? saved.botSpeed : DEFAULT_SETTINGS.botSpeed,
           theme: ["classic", "casual"].includes(saved.theme) ? saved.theme : DEFAULT_SETTINGS.theme,
           soundEnabled: saved.soundEnabled !== false,
+          showStats: saved.showStats !== false,
           userName: cleanName(saved.userName || DEFAULT_SETTINGS.userName, DEFAULT_SETTINGS.userName),
           botNames: Array.isArray(saved.botNames)
             ? [0, 1, 2].map(i => cleanName(saved.botNames[i] || DEFAULT_SETTINGS.botNames[i]))
@@ -2606,6 +2875,15 @@
 
     function resumeSavedGame() {
       if (state.phase === "bidding") {
+        state.highBid = 0;
+        state.highBidder = null;
+        state.bidTeam = null;
+        state.shootMoon = false;
+        state.passed = [false, false, false, false];
+        state.lastBidByPlayer = [null, null, null, null];
+        state.currentBidder = 0;
+        state.auctionStarted = false;
+        state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
         continueBidding();
       } else if (state.phase === "chooseTrump") {
         setPrompt("Choose trump", "Choose trump before returning five cards to the nest.");
@@ -2849,7 +3127,7 @@
         clearDealAnimation();
         state.dealAnimating = false;
         state.phase = "bidding";
-        logMessage(`${playerName(state.dealer)} deals. Review or rotate the hands before bidding.`);
+        logMessage(`${playerName(state.dealer)} deals. Review or rotate the hands, then choose your bid.`);
         renderAll();
         continueBidding();
       }, total);
@@ -2882,85 +3160,30 @@
 
     function continueBidding() {
       if (state.phase !== "bidding") return;
-
-      if (!state.auctionStarted) {
-        setPrompt("Review your hand", "Rotate hands if desired, then begin bidding.");
-        renderAll();
-        return;
-      }
-
-      const active = [0, 1, 2, 3].filter(i => !state.passed[i]);
-      if (active.length === 1) {
-        const winner = active[0];
-
-        if (winner === 0 && state.highBidder === null) {
-          state.currentBidder = 0;
-          state.bidCandidate = settings.bidStart;
-          setPrompt("Your bid", `Open at ${settings.bidStart}. You may rotate hands before bidding.`);
-          renderAll();
-          return;
-        }
-
-        if (state.highBidder === null) {
-          state.highBidder = winner;
-          state.highBid = settings.bidStart;
-          state.shootMoon = false;
-          logMessage(`${playerName(winner)} takes the bid at ${settings.bidStart}.`);
-        }
-        finishBidding();
-        return;
-      }
-
-      while (state.passed[state.currentBidder]) {
-        state.currentBidder = (state.currentBidder + 1) % 4;
-      }
-
-      state.bidCandidate = nextLegalBid();
+      state.currentBidder = 0;
+      state.auctionStarted = false;
+      state.highBid = 0;
+      state.highBidder = null;
+      state.bidTeam = null;
+      state.shootMoon = false;
+      state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
+      setPrompt("Choose your bid", "Rotate hands if desired, set the bid, then take it.");
       renderAll();
-
-      if (state.currentBidder === 0) {
-        setPrompt("Your bid", state.highBid > 0
-          ? (state.highBid === 200
-            ? `${playerName(state.highBidder)} currently leads at 200. Bid 400 or pass.`
-            : `${playerName(state.highBidder)} currently leads at ${state.highBid}. Raise by at least 5 or pass.`)
-          : `Open at ${settings.bidStart} or pass.`);
-        renderControls();
-      } else {
-        setPrompt(`${playerName(state.currentBidder)} is thinking`, "Deciding whether to bid.");
-        scheduleBot(() => botBid(state.currentBidder), botDelay("bid"));
-      }
     }
 
-    function beginBidding() {
-      if (state.phase !== "bidding" || state.auctionStarted) return;
+    function takeSelectedBid() {
+      if (state.phase !== "bidding" || state.animatingPlay || state.dealAnimating) return;
+      const bid = normalizeBidValue(state.bidCandidate, 100);
+      state.bidCandidate = bid;
+      state.highBid = bid;
+      state.highBidder = 0;
+      state.bidTeam = 0;
+      state.shootMoon = bid === 400;
+      state.lastBidByPlayer = [bid, null, null, null];
       state.auctionStarted = true;
-      logMessage("Bidding begins.");
+      logMessage(`${playerName(0)} takes the bid at ${bid}${state.shootMoon ? " as a moon bid" : ""}.`);
       playSound("bid");
-      renderAll();
-      continueBidding();
-    }
-
-    function humanBid(action) {
-      if (state.phase !== "bidding" || !state.auctionStarted || state.currentBidder !== 0) return;
-      if (action === "pass") {
-        const active = [0,1,2,3].filter(i => !state.passed[i]);
-        if (active.length === 1) return;
-        state.passed[0] = true;
-        state.lastBidByPlayer[0] = "Pass";
-        logMessage("You pass.");
-        playSound("pass");
-      } else {
-        const minimum = nextLegalBid();
-        const bid = normalizeBidValue(state.bidCandidate, minimum);
-        state.highBid = bid;
-        state.highBidder = 0;
-        state.shootMoon = bid === 400;
-        state.lastBidByPlayer[0] = bid;
-        logMessage(`You bid ${bid}${state.shootMoon ? " as a moon bid" : ""}.`);
-        playSound("bid");
-      }
-      state.currentBidder = (state.currentBidder + 1) % 4;
-      continueBidding();
+      finishBidding();
     }
 
     function aiProfile() {
@@ -4092,7 +4315,7 @@
     }
 
     function canRotateHands() {
-      return state.phase === "bidding" && !state.auctionStarted && state.cardsPlayed === 0 && !state.animatingPlay && !state.dealAnimating;
+      return state.phase === "bidding" && state.highBidder === null && state.cardsPlayed === 0 && !state.animatingPlay && !state.dealAnimating;
     }
 
     function openSettings() {
@@ -4128,8 +4351,8 @@
             </select>
           </div>
           <div class="field">
-            <label for="bidStartSetting">Opening bid</label>
-            <input id="bidStartSetting" type="number" min="100" max="200" step="5" value="${settings.bidStart}">
+            <label for="bidStartSetting">Default bid</label>
+            <input id="bidStartSetting" type="number" min="100" max="400" step="5" value="${settings.bidStart}">
           </div>
           <div class="field full settings-check-row">
             <label class="checkbox-setting" for="allowNoTrumpSetting">
@@ -4139,6 +4362,10 @@
             <label class="checkbox-setting" for="soundEnabledSetting">
               <input id="soundEnabledSetting" type="checkbox" ${settings.soundEnabled ? "checked" : ""}>
               Sound effects
+            </label>
+            <label class="checkbox-setting" for="showStatsSetting">
+              <input id="showStatsSetting" type="checkbox" ${settings.showStats ? "checked" : ""}>
+              Game stats after two hands
             </label>
           </div>
           <div class="field">
@@ -4210,12 +4437,13 @@
           settingsVersion: SETTINGS_VERSION,
           rookRank: document.getElementById("rookRankSetting").value,
           winScore: clamp(Math.round((Number.isFinite(selectedScore) ? selectedScore : 1000) / 5) * 5, 100, 5000),
-          bidStart: clamp(Math.round((Number.isFinite(selectedBidStart) ? selectedBidStart : DEFAULT_SETTINGS.bidStart) / 5) * 5, 100, 200),
+          bidStart: normalizeBidValue(Number.isFinite(selectedBidStart) ? selectedBidStart : DEFAULT_SETTINGS.bidStart, 100),
           allowNoTrump: document.getElementById("allowNoTrumpSetting").checked,
           aiDifficulty: document.getElementById("aiDifficultySetting").value,
           botSpeed: document.getElementById("botSpeedSetting").value,
           theme: document.querySelector('input[name="themeSetting"]:checked')?.value || "classic",
           soundEnabled: document.getElementById("soundEnabledSetting").checked,
+          showStats: document.getElementById("showStatsSetting").checked,
           userName: cleanName(document.getElementById("userNameSetting").value, DEFAULT_SETTINGS.userName),
           botNames: [
             cleanName(document.getElementById("leftNameSetting").value),
@@ -4329,7 +4557,9 @@
     }
 
     function statsTickerIsBlocked() {
-      return els.toast.classList.contains("show")
+      return !settings.showStats
+        || completedHandStats().length < 2
+        || els.toast.classList.contains("show")
         || els.modalBackdrop.classList.contains("open")
         || !els.tableDialog.hidden
         || state.phase === "claimReveal";
@@ -4385,17 +4615,20 @@
     }
 
     function renderBidBoard() {
-      if (state.highBidder === null || state.highBid <= 0) {
+      if (state.phase === "bidding" && state.highBidder === null) {
+        els.bidWinnerName.textContent = "Your bid";
+        els.bidWinnerValue.textContent = state.bidCandidate;
+      } else if (state.highBidder === null || state.highBid <= 0) {
         els.bidWinnerName.textContent = "No bid";
-        els.bidWinnerValue.textContent = state.phase === "bidding" ? settings.bidStart : "—";
+        els.bidWinnerValue.textContent = "—";
       } else {
         els.bidWinnerName.textContent = playerName(state.highBidder);
         els.bidWinnerValue.textContent = state.highBid;
       }
-      const editable = state.phase === "bidding" && state.auctionStarted && state.currentBidder === 0;
+      const editable = state.phase === "bidding" && state.highBidder === null;
       els.bidWinnerDisplay.disabled = !editable;
       els.bidWinnerDisplay.classList.toggle("editable", editable);
-      els.bidWinnerDisplay.title = editable ? "Click to type your bid" : "Current winning bid";
+      els.bidWinnerDisplay.title = editable ? "Click to type your bid" : "Current bid";
     }
 
     function renderScores() {
@@ -4452,7 +4685,7 @@
     function renderPlayers() {
       for (let i = 0; i < 4; i++) {
         const playerEl = document.getElementById(`player${i}`);
-        playerEl.classList.toggle("active", state.phase === "bidding" ? state.auctionStarted && state.currentBidder === i : state.phase === "playing" && state.turn === i);
+        playerEl.classList.toggle("active", state.phase === "bidding" ? i === 0 : state.phase === "playing" && state.turn === i);
         playerEl.classList.toggle("bid-winner", state.highBidder === i && ["pickup","kittyReveal","discard","chooseTrump","playing","scoring"].includes(state.phase));
         const detail = document.getElementById(`detail${i}`);
         const bidText = state.highBidder === i && state.highBid
@@ -4481,7 +4714,7 @@
       } else if (!state.trump) {
         els.trumpDot.style.background = "#777";
         els.tableInfoText.textContent = state.phase === "bidding"
-          ? `Bidding • ${state.highBid ? `High bid ${state.highBid}` : `Opening bid ${settings.bidStart}`}`
+          ? `Set bid • ${state.bidCandidate}`
           : state.phase === "kittyReveal"
             ? "Kitty"
             : "No trump selected";
@@ -4572,57 +4805,56 @@
         return;
       }
 
-      if (state.phase === "bidding" && !state.auctionStarted) {
-        addControlButton("Begin Bidding", "primary", beginBidding);
-        return;
-      }
+      if (state.phase === "bidding") {
+        const minBid = 100;
+        state.bidCandidate = normalizeBidValue(state.bidCandidate, minBid);
+        const minusLabel = state.bidCandidate >= 400 ? "−200" : "−5";
+        const plusLabel = state.bidCandidate === 200 ? "+200" : "+5";
+        const picker = document.createElement("div");
+        picker.className = "bid-picker";
+        picker.innerHTML = `
+          <button class="btn small" id="bidMinus" ${state.bidCandidate <= minBid ? "disabled" : ""}>${minusLabel}</button>
+          <input class="bid-value-input" id="bidValueInput" type="number" min="${minBid}" max="400" step="5" value="${state.bidCandidate}" aria-label="Bid amount">
+          <button class="btn small" id="bidPlus" ${state.bidCandidate >= 400 ? "disabled" : ""}>${plusLabel}</button>
+        `;
+        els.controls.appendChild(picker);
 
-      if (state.phase === "bidding" && state.currentBidder === 0) {
-        const minBid = nextLegalBid();
-        if (minBid <= 400) {
-          state.bidCandidate = normalizeBidValue(state.bidCandidate, minBid);
-          const minusLabel = state.bidCandidate >= 400 ? "−200" : "−5";
-          const plusLabel = state.bidCandidate === 200 ? "+200" : "+5";
-          const picker = document.createElement("div");
-          picker.className = "bid-picker";
-          picker.innerHTML = `
-            <button class="btn small" id="bidMinus" ${state.bidCandidate <= minBid ? "disabled" : ""}>${minusLabel}</button>
-            <input class="bid-value-input" id="bidValueInput" type="number" min="${minBid}" max="400" step="5" value="${state.bidCandidate}" aria-label="Bid amount">
-            <button class="btn small" id="bidPlus" ${state.bidCandidate >= 400 ? "disabled" : ""}>${plusLabel}</button>
-          `;
-          els.controls.appendChild(picker);
-
-          const input = picker.querySelector("#bidValueInput");
-          const commitInput = () => {
-            state.bidCandidate = normalizeBidValue(input.value, minBid);
-            input.value = state.bidCandidate;
-          };
-          input.addEventListener("focus", () => input.select());
-          input.addEventListener("change", () => {
+        const input = picker.querySelector("#bidValueInput");
+        const commitInput = () => {
+          state.bidCandidate = normalizeBidValue(input.value, minBid);
+          input.value = state.bidCandidate;
+        };
+        input.addEventListener("focus", () => input.select());
+        input.addEventListener("input", () => {
+          const value = Number(input.value);
+          if (Number.isFinite(value)) {
+            state.bidCandidate = value;
+            els.bidWinnerValue.textContent = value;
+          }
+        });
+        input.addEventListener("change", () => {
+          commitInput();
+          renderAll();
+        });
+        input.addEventListener("keydown", event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
             commitInput();
-            renderControls();
-          });
-          input.addEventListener("keydown", event => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              commitInput();
-              humanBid("bid");
-            }
-          });
-          picker.querySelector("#bidMinus").addEventListener("click", () => {
-            state.bidCandidate = previousBidValue(state.bidCandidate, minBid);
-            renderControls();
-          });
-          picker.querySelector("#bidPlus").addEventListener("click", () => {
-            state.bidCandidate = nextBidValue(state.bidCandidate);
-            renderControls();
-          });
-          addControlButton(`Bid ${state.bidCandidate}`, "primary", () => {
-            commitInput();
-            humanBid("bid");
-          });
-        }
-        addControlButton("Pass", "", () => humanBid("pass"));
+            takeSelectedBid();
+          }
+        });
+        picker.querySelector("#bidMinus").addEventListener("click", () => {
+          state.bidCandidate = previousBidValue(state.bidCandidate, minBid);
+          renderAll();
+        });
+        picker.querySelector("#bidPlus").addEventListener("click", () => {
+          state.bidCandidate = nextBidValue(state.bidCandidate);
+          renderAll();
+        });
+        addControlButton(`Take Bid ${state.bidCandidate}`, "primary", () => {
+          commitInput();
+          takeSelectedBid();
+        });
         return;
       }
 
