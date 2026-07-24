@@ -1823,6 +1823,17 @@
       letter-spacing: .035em;
     }
 
+    .sidebar-actions .sidebar-go-down {
+      min-height: 36px;
+      padding-block: 5px;
+      font-size: 11px;
+      opacity: .82;
+    }
+
+    .sidebar-actions .sidebar-go-down:hover:not(:disabled) {
+      opacity: 1;
+    }
+
     .game-main {
       min-width: 0;
       min-height: 0;
@@ -1926,7 +1937,17 @@
       .topbar-last-trick { order: 3; width: 100%; min-width: 0; }
       .game-layout { grid-template-columns: 1fr; }
       .game-sidebar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .sidebar-actions { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; margin: 0; }
+      .sidebar-actions {
+        grid-column: 1 / -1;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "new settings"
+          "down down";
+        margin: 0;
+      }
+      #newGameButton { grid-area: new; }
+      #settingsButton { grid-area: settings; }
+      #goDownButton { grid-area: down; }
       .game-main { grid-template-rows: minmax(500px, 1fr) auto; }
     }
 
@@ -2161,6 +2182,7 @@
 
         <div class="sidebar-actions">
           <button class="btn danger" id="newGameButton" title="Start a new game">＋ <span>New Game</span></button>
+          <button class="btn sidebar-go-down" id="goDownButton" title="End this hand and lose the bid points" hidden>↘ <span>Go Down</span></button>
           <button class="btn" id="settingsButton" title="Game settings">⚙ <span>Settings</span></button>
         </div>
       </aside>
@@ -2267,14 +2289,14 @@
     const TEAM_OF = [0, 1, 0, 1];
     const POSITIONS = ["south", "west", "north", "east"];
 
-    const SETTINGS_VERSION = 10;
+    const SETTINGS_VERSION = 11;
     const GAME_SAVE_VERSION = 1;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
     const DEFAULT_SETTINGS = {
       settingsVersion: SETTINGS_VERSION,
       rookRank: "10.5",
       winScore: 1000,
-      bidStart: 140,
+      bidStart: 150,
       allowNoTrump: true,
       aiDifficulty: "normal",
       botSpeed: "normal",
@@ -2368,6 +2390,7 @@
       rotateButton: document.getElementById("rotateButton"),
       settingsButton: document.getElementById("settingsButton"),
       newGameButton: document.getElementById("newGameButton"),
+      goDownButton: document.getElementById("goDownButton"),
       startButton: document.getElementById("startButton"),
       toast: document.getElementById("toast"),
       modalBackdrop: document.getElementById("modalBackdrop"),
@@ -2382,6 +2405,7 @@
 
     els.startButton.addEventListener("click", () => startNewGame(false));
     els.newGameButton.addEventListener("click", () => confirmNewGame());
+    els.goDownButton.addEventListener("click", goDown);
     els.settingsButton.addEventListener("click", openSettings);
     els.rotateButton.addEventListener("click", rotateHands);
     els.claimRevealTable.addEventListener("click", finishClaimRest);
@@ -2401,9 +2425,12 @@
       try {
         const saved = JSON.parse(localStorage.getItem("rookPartnershipSettings") || "null");
         if (!saved) return structuredClone(DEFAULT_SETTINGS);
-        const savedBidStart = Number.isFinite(Number(saved.bidStart))
+        let savedBidStart = Number.isFinite(Number(saved.bidStart))
           ? clamp(Math.round(Number(saved.bidStart) / 5) * 5, 100, 200)
           : DEFAULT_SETTINGS.bidStart;
+        if (Number(saved.settingsVersion || 0) < SETTINGS_VERSION && savedBidStart === 140) {
+          savedBidStart = DEFAULT_SETTINGS.bidStart;
+        }
         return {
           settingsVersion: SETTINGS_VERSION,
           rookRank: ["high", "low", "10.5"].includes(saved.rookRank) ? saved.rookRank : DEFAULT_SETTINGS.rookRank,
@@ -2567,6 +2594,9 @@
         state.trumpHandRecord = restored.trumpHandRecord && Number.isFinite(Number(restored.trumpHandRecord.count))
           ? restored.trumpHandRecord
           : null;
+        if (state.phase === "bidding" && state.highBidder === null && state.highBid <= 0) {
+          state.bidCandidate = settings.bidStart;
+        }
         return state.phase !== "idle" && state.phase !== "dealing";
       } catch (error) {
         clearSavedGame();
@@ -4180,7 +4210,7 @@
           settingsVersion: SETTINGS_VERSION,
           rookRank: document.getElementById("rookRankSetting").value,
           winScore: clamp(Math.round((Number.isFinite(selectedScore) ? selectedScore : 1000) / 5) * 5, 100, 5000),
-          bidStart: clamp(Math.round((Number.isFinite(selectedBidStart) ? selectedBidStart : 140) / 5) * 5, 100, 200),
+          bidStart: clamp(Math.round((Number.isFinite(selectedBidStart) ? selectedBidStart : DEFAULT_SETTINGS.bidStart) / 5) * 5, 100, 200),
           allowNoTrump: document.getElementById("allowNoTrumpSetting").checked,
           aiDifficulty: document.getElementById("aiDifficultySetting").value,
           botSpeed: document.getElementById("botSpeedSetting").value,
@@ -4194,6 +4224,9 @@
           ]
         };
         saveSettings();
+        if (state.phase === "bidding" && state.highBidder === null && state.highBid <= 0) {
+          state.bidCandidate = settings.bidStart;
+        }
         applyTheme(settings.theme);
         closeModal();
         if (activeGame && oldRank !== settings.rookRank) logMessage(`Rook rank changed to ${rookRankLabel()}.`);
@@ -4340,6 +4373,7 @@
       renderControls();
       renderStatsTicker();
       els.rotateButton.disabled = !canRotateHands();
+      els.goDownButton.hidden = !(state.phase === "playing" && state.bidTeam === 0 && state.trick.length < 4);
       saveGameState();
     }
 
@@ -4602,9 +4636,6 @@
       if (state.phase === "playing") {
         if (state.turn === 0 && canClaimRest()) {
           addControlButton("The Rest Are Mine", "success", claimRest);
-        }
-        if (state.bidTeam === 0 && state.trick.length < 4) {
-          addControlButton("Go Down", "danger", goDown);
         }
         return;
       }
