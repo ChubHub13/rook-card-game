@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rook Partnership</title>
+  <title>Rook Solitaire</title>
   <style>
     :root {
       --bg: #0e1714;
@@ -2386,6 +2386,121 @@
       }
     }
 
+
+    /* Player-count layouts for Rook Solitaire. */
+    .table-shell[data-player-count="3"] #player1 { left: 12%; top: 18%; transform: none; }
+    .table-shell[data-player-count="3"] #player2 { left: auto; right: 12%; top: 18%; transform: none; }
+    .table-shell[data-player-count="3"] #slot1 { left: 15%; top: 18%; right: auto; transform: rotate(-4deg); }
+    .table-shell[data-player-count="3"] #slot2 { left: auto; right: 15%; top: 18%; transform: rotate(4deg); }
+
+    .table-shell[data-player-count="5"] #player1 { left: 18px; top: 64%; transform: translateY(-50%); }
+    .table-shell[data-player-count="5"] #player2 { left: 18px; top: 21%; transform: none; }
+    .table-shell[data-player-count="5"] #player3 { right: 18px; top: 21%; transform: none; }
+    .table-shell[data-player-count="5"] #player4 { right: 18px; top: 64%; transform: translateY(-50%); }
+    .table-shell[data-player-count="5"] #slot1 { left: 8%; top: 60%; right: auto; transform: rotate(-6deg); }
+    .table-shell[data-player-count="5"] #slot2 { left: 18%; top: 4%; transform: rotate(-3deg); }
+    .table-shell[data-player-count="5"] #slot3 { right: 18%; top: 4%; left: auto; transform: rotate(3deg); }
+    .table-shell[data-player-count="5"] #slot4 { right: 8%; top: 60%; left: auto; transform: rotate(6deg); }
+
+    .score-entries {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+    .sidebar-scoreboard.individual .team-score {
+      padding-block: 6px;
+    }
+    .sidebar-scoreboard.individual .score-value {
+      font-size: 20px;
+    }
+    .called-card-note {
+      display: block;
+      margin-top: 4px;
+      color: var(--gold);
+      font-size: 10px;
+      font-weight: 850;
+      line-height: 1.25;
+    }
+    body[data-theme="casual"] .called-card-note { color: #17649e; }
+    .call-partner-dialog {
+      width: min(760px, 92%);
+    }
+    .call-partner-intro {
+      margin: 0 0 10px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 12px;
+    }
+    .call-card-grid {
+      max-height: min(390px, 52vh);
+      overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(9, minmax(50px, 1fr));
+      gap: 7px;
+      padding: 5px;
+    }
+    .call-card-button {
+      min-width: 0;
+      padding: 3px;
+      border: 1px solid rgba(229,183,79,.28);
+      border-radius: 9px;
+      background: rgba(255,255,255,.035);
+      cursor: pointer;
+      transition: transform .15s ease, background .15s ease;
+    }
+    .call-card-button:hover {
+      z-index: 2;
+      transform: translateY(-3px);
+      background: rgba(229,183,79,.12);
+    }
+    .call-card-button .card {
+      width: 46px;
+      height: 66px;
+      margin: 0 auto;
+      pointer-events: none;
+      font-size: 9px;
+    }
+    .call-card-button .corner { font-size: 8px; }
+    .call-card-button .card-number { font-size: 22px; }
+    .call-card-button .rook-bird { font-size: 22px; }
+    @media (max-width: 760px) {
+      .call-card-grid { grid-template-columns: repeat(6, minmax(46px, 1fr)); }
+    }
+
+    .direct-bid-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bid-entry-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .bid-action-group {
+      display: flex;
+      gap: 9px;
+    }
+    .bid-action-group .btn { min-width: 130px; }
+    .bitter-bunch {
+      color: #f4dfb0;
+      border-color: rgba(244,223,176,.28);
+      background: rgba(91,44,19,.7);
+    }
+    .bitter-bunch:hover:not(:disabled) { background: rgba(118,56,22,.88); }
+    body[data-theme="casual"] .bitter-bunch {
+      color: #fff;
+      border-color: rgba(255,255,255,.24);
+      background: #384a5c;
+    }
+    body[data-theme="casual"] .bitter-bunch:hover:not(:disabled) { background: #27394a; }
+
+    @media (max-height: 760px) {
+      .table-shell[data-player-count="5"] .player { padding: 5px 7px; min-width: 118px; }
+      .table-shell[data-player-count="5"] .player-hand-points { font-size: 8px; }
+    }
+
   </style>
 </head>
 <body>
@@ -2394,8 +2509,8 @@
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">R</div>
         <div class="brand-copy">
-          <h1>ROOK</h1>
-          <p>The Classic Card Game</p>
+          <h1>ROOK SOLITAIRE</h1>
+          <p>Choose the hand you want to play</p>
         </div>
       </div>
       <section class="score-history topbar-last-trick" aria-label="Last trick">
@@ -2429,18 +2544,7 @@
 
         <section class="scoreboard sidebar-scoreboard sidebar-panel" aria-label="Scoreboard">
           <div class="sidebar-heading">Score</div>
-          <div class="team-score" title="Your team score">
-            <div class="sidebar-score-name">Us</div>
-            <div class="score-value-wrap">
-              <div class="score-value" id="team0Score">0</div>
-            </div>
-          </div>
-          <div class="team-score opponents" title="Other team score">
-            <div class="sidebar-score-name">Them</div>
-            <div class="score-value-wrap">
-              <div class="score-value" id="team1Score">0</div>
-            </div>
-          </div>
+          <div class="score-entries" id="scoreEntries"></div>
           <div class="score-center">
             <strong id="handLabel">Ready to play</strong>
             <span id="targetLabel">First to 1000 points</span>
@@ -2455,7 +2559,7 @@
       </aside>
 
       <div class="game-main">
-        <section class="table-shell" aria-label="Rook table">
+        <section class="table-shell" aria-label="Rook Solitaire table">
       <div class="player north" id="player2">
         <div class="avatar" id="avatar2">P</div>
         <div class="player-meta">
@@ -2486,6 +2590,16 @@
         <div class="mini-cards" id="mini3"></div>
       </div>
 
+      <div class="player far-east" id="player4" hidden>
+        <div class="avatar" id="avatar4">F</div>
+        <div class="player-meta">
+          <div class="player-name" id="name4">Fourth Bot</div>
+          <div class="player-detail" id="detail4">Opponent</div>
+          <div class="player-hand-points" id="handPoints4">This hand: 0</div>
+        </div>
+        <div class="mini-cards" id="mini4"></div>
+      </div>
+
       <div class="player south" id="player0">
         <div class="avatar" id="avatar0">Y</div>
         <div class="player-meta">
@@ -2499,6 +2613,7 @@
         <div class="play-slot north" id="slot2"></div>
         <div class="play-slot west" id="slot1"></div>
         <div class="play-slot east" id="slot3"></div>
+        <div class="play-slot far-east" id="slot4" hidden></div>
         <div class="play-slot south" id="slot0"></div>
       </div>
 
@@ -2513,7 +2628,7 @@
           <div class="nest-card"></div>
           <div class="nest-card"></div>
         </div>
-        <div>5-card nest</div>
+        <div id="nestLabel">5-card nest</div>
       </div>
 
       <div class="hand-zone">
@@ -2523,7 +2638,7 @@
 
         <section class="control-panel">
           <div class="prompt">
-            <strong id="promptTitle">Welcome to Rook</strong>
+            <strong id="promptTitle">Welcome to Rook Solitaire</strong>
             <span id="promptText">Start a new game to deal the cards.</span>
           </div>
           <div class="game-controls" id="gameControls">
@@ -2553,11 +2668,15 @@
     const SUITS = ["red", "yellow", "green", "black"];
     const SUIT_LABELS = { red: "Red", yellow: "Yellow", green: "Green", black: "Black", none: "No Trump" };
     const VALUES = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-    const TEAM_OF = [0, 1, 0, 1];
-    const POSITIONS = ["south", "west", "north", "east"];
+    const POSITIONS = ["south", "west", "north", "east", "far-east"];
+    const DEAL_CONFIG = {
+      3: { handSize: 13, nestSize: 6 },
+      4: { handSize: 10, nestSize: 5 },
+      5: { handSize: 8, nestSize: 5 }
+    };
 
-    const SETTINGS_VERSION = 12;
-    const GAME_SAVE_VERSION = 1;
+    const SETTINGS_VERSION = 14;
+    const GAME_SAVE_VERSION = 2;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
     const DEFAULT_SETTINGS = {
       settingsVersion: SETTINGS_VERSION,
@@ -2570,8 +2689,10 @@
       theme: "classic",
       soundEnabled: true,
       showStats: true,
+      callPartner: false,
+      playerCount: 4,
       userName: "You",
-      botNames: ["Mara", "Cal", "June"]
+      botNames: ["Mara", "Cal", "June", "Wes"]
     };
 
     const AI_PROFILES = {
@@ -2603,13 +2724,13 @@
 
     const state = {
       phase: "idle",
-      scores: [0, 0],
+      scores: initialScores(),
       scoreHistory: [],
       lastHand: null,
       lastTrick: null,
       handNumber: 0,
       dealer: 3,
-      hands: [[], [], [], []],
+      hands: playerIndexes().map(() => []),
       nest: [],
       captured: [[], []],
       finalHandPoints: null,
@@ -2621,13 +2742,17 @@
       highBidder: null,
       shootMoon: false,
       tricksWon: [0, 0],
-      tricksWonByPlayer: [0, 0, 0, 0],
-      passed: [false, false, false, false],
-      lastBidByPlayer: [null, null, null, null],
+      tricksWonByPlayer: playerIndexes().map(() => 0),
+      passed: playerIndexes().map(() => false),
+      lastBidByPlayer: playerIndexes().map(() => null),
       currentBidder: 0,
       auctionStarted: false,
       bidCandidate: settings.bidStart,
       bidTeam: null,
+      calledCard: null,
+      calledPartner: null,
+      calledPartnerRevealed: false,
+      calledCardLeadBack: false,
       lastTrickWinner: null,
       selectedDiscards: new Set(),
       prompt: "",
@@ -2644,9 +2769,8 @@
       controls: document.getElementById("gameControls"),
       promptTitle: document.getElementById("promptTitle"),
       promptText: document.getElementById("promptText"),
-      team0Score: document.getElementById("team0Score"),
-      team1Score: document.getElementById("team1Score"),
-      handPoints: [0, 1, 2, 3].map(index => document.getElementById(`handPoints${index}`)),
+      scoreEntries: document.getElementById("scoreEntries"),
+      handPoints: [0, 1, 2, 3, 4].map(index => document.getElementById(`handPoints${index}`)),
       bidWinnerDisplay: document.getElementById("bidWinnerDisplay"),
       bidWinnerName: document.getElementById("bidWinnerName"),
       bidWinnerValue: document.getElementById("bidWinnerValue"),
@@ -2668,7 +2792,8 @@
       tableDialog: document.getElementById("tableDialog"),
       statsTicker: document.getElementById("statsTicker"),
       statsTickerText: document.getElementById("statsTickerText"),
-      statsTickerCount: document.getElementById("statsTickerCount")
+      statsTickerCount: document.getElementById("statsTickerCount"),
+      nestLabel: document.getElementById("nestLabel")
     };
 
     els.startButton.addEventListener("click", () => startNewGame(false));
@@ -2712,9 +2837,11 @@
           theme: ["classic", "casual"].includes(saved.theme) ? saved.theme : DEFAULT_SETTINGS.theme,
           soundEnabled: saved.soundEnabled !== false,
           showStats: saved.showStats !== false,
+          callPartner: saved.callPartner === true,
+          playerCount: [3, 4, 5].includes(Number(saved.playerCount)) ? Number(saved.playerCount) : DEFAULT_SETTINGS.playerCount,
           userName: cleanName(saved.userName || DEFAULT_SETTINGS.userName, DEFAULT_SETTINGS.userName),
           botNames: Array.isArray(saved.botNames)
-            ? [0, 1, 2].map(i => cleanName(saved.botNames[i] || DEFAULT_SETTINGS.botNames[i]))
+            ? [0, 1, 2, 3].map(i => cleanName(saved.botNames[i] || DEFAULT_SETTINGS.botNames[i]))
             : [...DEFAULT_SETTINGS.botNames]
         };
       } catch (error) {
@@ -2834,7 +2961,8 @@
         const saved = JSON.parse(localStorage.getItem(GAME_SAVE_KEY) || "null");
         if (!saved || saved.version !== GAME_SAVE_VERSION || !saved.state) return false;
         const restored = saved.state;
-        if (!Array.isArray(restored.hands) || restored.hands.length !== 4 || !Array.isArray(restored.scores)) return false;
+        if (!Array.isArray(restored.hands) || ![3, 4, 5].includes(restored.hands.length) || !Array.isArray(restored.scores)) return false;
+        settings.playerCount = restored.hands.length;
         Object.assign(state, restored, {
           selectedDiscards: new Set(restored.selectedDiscards || []),
           animatingPlay: false,
@@ -2848,15 +2976,18 @@
           }
         }
         state.shootMoon = Number(state.highBid) === 400;
+        state.scores = Array.isArray(restored.scores) && restored.scores.length === scoreEntryCount()
+          ? restored.scores.map(value => Number(value) || 0)
+          : initialScores();
         state.tricksWon = Array.isArray(restored.tricksWon) && restored.tricksWon.length === 2
           ? restored.tricksWon.map(value => Math.max(0, Number(value) || 0))
-          : [0, 1].map(team => Math.floor(((state.captured && state.captured[team]) || []).length / 4));
-        state.tricksWonByPlayer = Array.isArray(restored.tricksWonByPlayer) && restored.tricksWonByPlayer.length === 4
+          : [0, 1].map(team => Math.floor(((state.captured && state.captured[team]) || []).length / playerCount()));
+        state.tricksWonByPlayer = Array.isArray(restored.tricksWonByPlayer) && restored.tricksWonByPlayer.length === playerCount()
           ? restored.tricksWonByPlayer.map(value => Math.max(0, Number(value) || 0))
-          : [0, 0, 0, 0];
-        state.lastBidByPlayer = Array.isArray(restored.lastBidByPlayer) && restored.lastBidByPlayer.length === 4
+          : playerIndexes().map(() => 0);
+        state.lastBidByPlayer = Array.isArray(restored.lastBidByPlayer) && restored.lastBidByPlayer.length === playerCount()
           ? restored.lastBidByPlayer
-          : [null, null, null, null];
+          : playerIndexes().map(() => null);
         state.auctionStarted = typeof restored.auctionStarted === "boolean"
           ? restored.auctionStarted
           : state.phase !== "bidding" || state.highBid > 0 || state.passed.some(Boolean);
@@ -2879,25 +3010,29 @@
         state.highBidder = null;
         state.bidTeam = null;
         state.shootMoon = false;
-        state.passed = [false, false, false, false];
-        state.lastBidByPlayer = [null, null, null, null];
+        state.passed = playerIndexes().map(() => false);
+        state.lastBidByPlayer = playerIndexes().map(() => null);
         state.currentBidder = 0;
         state.auctionStarted = false;
         state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
         continueBidding();
       } else if (state.phase === "chooseTrump") {
-        setPrompt("Choose trump", "Choose trump before returning five cards to the nest.");
+        setPrompt("Choose trump", `Choose trump before returning ${discardCount()} cards to the nest.`);
         openTrumpPicker();
       } else if (state.phase === "discard") {
-        setPrompt("Return five cards to the nest", `${state.selectedDiscards.size} of 5 selected.`);
+        setPrompt(`Return ${discardCount()} cards to the nest`, `${state.selectedDiscards.size} of ${discardCount()} selected.`);
         renderAll();
+      } else if (state.phase === "callPartner") {
+        setPrompt("Call your partner", "Choose the card that identifies your partner for this hand.");
+        renderAll();
+        requestAnimationFrame(openCallPartnerPicker);
       } else if (state.phase === "kittyReveal" && state.highBidder === 0) {
         setPrompt("Kitty", "Click the kitty to add it to your hand.");
         renderAll();
       } else if (state.phase === "pickup" && state.highBidder !== 0) {
         scheduleBot(() => botPrepareBidder(state.highBidder), botDelay("prepare"));
       } else if (state.phase === "playing") {
-        if (state.trick.length === 4) {
+        if (state.trick.length === playerCount()) {
           scheduleBot(() => finishTrick(state.lastTrickWinner), botDelay("trick"));
         } else {
           advanceTurn();
@@ -2924,15 +3059,92 @@
       return Math.max(min, Math.min(max, value));
     }
 
+    function playerCount() {
+      return [3, 4, 5].includes(Number(settings.playerCount)) ? Number(settings.playerCount) : 4;
+    }
+
+    function playerIndexes() {
+      return Array.from({ length: playerCount() }, (_, index) => index);
+    }
+
+    function dealConfig() {
+      return DEAL_CONFIG[playerCount()] || DEAL_CONFIG[4];
+    }
+
+    function usesFixedTeamScoring() {
+      return playerCount() === 4 && !settings.callPartner;
+    }
+
+    function scoreEntryCount() {
+      return usesFixedTeamScoring() ? 2 : playerCount();
+    }
+
+    function initialScores() {
+      return Array.from({ length: scoreEntryCount() }, () => 0);
+    }
+
+    function isCurrentPartner(player) {
+      if (player === 0) return false;
+      if (settings.callPartner) return state.calledPartner === player;
+      return playerCount() === 4 && player === 2;
+    }
+
+    function teamOf(player) {
+      if (player === 0) return 0;
+      if (settings.callPartner && state.calledPartner !== null) {
+        return player === state.calledPartner ? 0 : 1;
+      }
+      return playerCount() === 4 && player === 2 ? 0 : 1;
+    }
+
+    function handTeamMembers(team) {
+      return playerIndexes().filter(player => teamOf(player) === team);
+    }
+
+    function scoreEntryName(index) {
+      return usesFixedTeamScoring() ? teamName(index) : playerName(index);
+    }
+
+    function scoreChangesForPlayers(teamChanges) {
+      if (usesFixedTeamScoring()) return [...teamChanges];
+      return playerIndexes().map(player => teamChanges[teamOf(player)]);
+    }
+
+    function applyScoreChanges(changes) {
+      const expected = scoreEntryCount();
+      if (!Array.isArray(state.scores) || state.scores.length !== expected) {
+        state.scores = initialScores();
+      }
+      changes.forEach((change, index) => {
+        state.scores[index] = Number(state.scores[index] || 0) + Number(change || 0);
+      });
+    }
+
+    function totalTricksInHand() {
+      return dealConfig().handSize;
+    }
+
+    function discardCount() {
+      return dealConfig().nestSize;
+    }
+
     function playerName(index) {
       if (index === 0) return settings.userName;
-      return settings.botNames[index - 1];
+      return settings.botNames[index - 1] || `Bot ${index}`;
     }
 
     function teamName(team) {
-      return team === 0
-        ? `${playerName(0)} & ${playerName(2)}`
-        : `${playerName(1)} & ${playerName(3)}`;
+      if (settings.callPartner && state.calledPartner !== null) {
+        return team === 0
+          ? `${playerName(0)} & ${playerName(state.calledPartner)}`
+          : "Defenders";
+      }
+      if (playerCount() === 4 && !settings.callPartner) {
+        return team === 0
+          ? `${playerName(0)} & ${playerName(2)}`
+          : `${playerName(1)} & ${playerName(3)}`;
+      }
+      return team === 0 ? playerName(0) : "Defenders";
     }
 
     function buildDeck() {
@@ -3004,26 +3216,29 @@
       closeTableDialog();
       state.trump = null;
       state.phase = "dealing";
-      state.scores = keepScores ? state.scores : [0, 0];
+      state.scores = keepScores && state.scores.length === scoreEntryCount() ? state.scores : initialScores();
       state.scoreHistory = keepScores ? state.scoreHistory : [];
       state.lastHand = keepScores ? state.lastHand : null;
       state.lastTrick = null;
       state.handNumber = keepScores ? state.handNumber : 0;
-      state.dealer = keepScores ? state.dealer : Math.floor(Math.random() * 4);
+      state.dealer = keepScores ? state.dealer : Math.floor(Math.random() * playerCount());
       state.winner = null;
       if (!keepScores) statsTickerIndex = 0;
       logMessage(keepScores ? "Starting the next hand." : `New game to ${settings.winScore} points.`);
       dealHand();
     }
 
-    function dealHand() {
+    function dealHand(options = {}) {
+      const redeal = Boolean(options.redeal);
       gameToken += 1;
       clearTimeout(botTimer);
       clearDealAnimation();
-      state.handNumber += 1;
-      state.dealer = (state.dealer + 1) % 4;
+      if (!redeal) {
+        state.handNumber += 1;
+        state.dealer = (state.dealer + 1) % playerCount();
+      }
       state.phase = "dealing";
-      state.hands = [[], [], [], []];
+      state.hands = playerIndexes().map(() => []);
       state.nest = [];
       state.captured = [[], []];
       state.finalHandPoints = null;
@@ -3034,13 +3249,17 @@
       state.highBidder = null;
       state.shootMoon = false;
       state.tricksWon = [0, 0];
-      state.tricksWonByPlayer = [0, 0, 0, 0];
-      state.passed = [false, false, false, false];
-      state.lastBidByPlayer = [null, null, null, null];
-      state.currentBidder = (state.dealer + 1) % 4;
+      state.tricksWonByPlayer = playerIndexes().map(() => 0);
+      state.passed = playerIndexes().map(() => false);
+      state.lastBidByPlayer = playerIndexes().map(() => null);
+      state.currentBidder = 0;
       state.auctionStarted = false;
       state.bidCandidate = settings.bidStart;
       state.bidTeam = null;
+      state.calledCard = null;
+      state.calledPartner = null;
+      state.calledPartnerRevealed = false;
+      state.calledCardLeadBack = false;
       state.lastTrickWinner = null;
       state.selectedDiscards = new Set();
       state.dealRotation = 0;
@@ -3050,18 +3269,26 @@
       state.dealAnimating = true;
 
       const deck = shuffle(buildDeck());
-      for (let round = 0; round < 10; round++) {
-        for (let offset = 1; offset <= 4; offset++) {
-          const player = (state.dealer + offset) % 4;
+      const { handSize } = dealConfig();
+      for (let round = 0; round < handSize; round++) {
+        for (let offset = 1; offset <= playerCount(); offset++) {
+          const player = (state.dealer + offset) % playerCount();
           state.hands[player].push(deck.pop());
         }
       }
       state.nest = deck.splice(0);
       state.hands.forEach(sortHand);
 
-      setPrompt("Dealing cards", "");
+      setPrompt(redeal ? "Bitter Bunch" : "Dealing cards", "");
       renderAll();
       runDealAnimation();
+    }
+
+    function bitterBunch() {
+      if (state.phase !== "bidding" || state.animatingPlay || state.dealAnimating) return;
+      playSound("pass");
+      logMessage("Bitter Bunch — all hands were thrown in and redealt.");
+      dealHand({ redeal: true });
     }
 
     function clearDealAnimation() {
@@ -3075,18 +3302,16 @@
       const tableRect = table.getBoundingClientRect();
       const startX = tableRect.left + tableRect.width * .5;
       const startY = tableRect.top + tableRect.height * .47;
-      const destinations = [
-        document.querySelector(".hand-zone"),
-        document.getElementById("player1"),
-        document.getElementById("player2"),
-        document.getElementById("player3"),
-        document.getElementById("nestDisplay")
-      ];
+      const destinations = playerIndexes().map(player =>
+        player === 0 ? document.querySelector(".hand-zone") : document.getElementById(`player${player}`)
+      );
+      const nestDestinationIndex = destinations.length;
+      destinations.push(document.getElementById("nestDisplay"));
       const order = [];
-      for (let round = 0; round < 10; round++) {
-        for (let offset = 1; offset <= 4; offset++) order.push((state.dealer + offset) % 4);
+      for (let round = 0; round < dealConfig().handSize; round++) {
+        for (let offset = 1; offset <= playerCount(); offset++) order.push((state.dealer + offset) % playerCount());
       }
-      order.push(4, 4, 4, 4, 4);
+      for (let i = 0; i < discardCount(); i++) order.push(nestDestinationIndex);
       const stagger = 31;
       const travel = 330;
 
@@ -3143,9 +3368,7 @@
     function normalizeBidValue(value, minimum) {
       let bid = Number.isFinite(Number(value)) ? Number(value) : minimum;
       bid = Math.round(bid / 5) * 5;
-      if (bid > 200 && bid < 400) bid = 400;
-      bid = Math.max(minimum, bid);
-      return Math.min(400, bid);
+      return clamp(bid, minimum, 400);
     }
 
     function previousBidValue(value, minimum) {
@@ -3179,7 +3402,7 @@
       state.highBidder = 0;
       state.bidTeam = 0;
       state.shootMoon = bid === 400;
-      state.lastBidByPlayer = [bid, null, null, null];
+      state.lastBidByPlayer = playerIndexes().map((_, player) => player === 0 ? bid : null);
       state.auctionStarted = true;
       logMessage(`${playerName(0)} takes the bid at ${bid}${state.shootMoon ? " as a moon bid" : ""}.`);
       playSound("bid");
@@ -3267,7 +3490,7 @@
       const estimatedMax = estimateMaxBid(state.hands[player]);
       let maxBid = estimatedMax + profile.bidBonus - (humanIsHighBidder ? profile.humanLeadPenalty : 0);
       maxBid = Math.max(maxBid, botMoonCeiling(player));
-      const active = [0,1,2,3].filter(i => !state.passed[i]);
+      const active = playerIndexes().filter(i => !state.passed[i]);
 
       if (state.highBidder === null
           && estimatedMax >= settings.bidStart - 10
@@ -3290,7 +3513,7 @@
         playSound("pass");
       }
 
-      state.currentBidder = (state.currentBidder + 1) % 4;
+      state.currentBidder = (state.currentBidder + 1) % playerCount();
       continueBidding();
     }
 
@@ -3353,7 +3576,7 @@
     }
 
     function finishBidding() {
-      state.bidTeam = TEAM_OF[state.highBidder];
+      state.bidTeam = teamOf(state.highBidder);
       state.phase = "pickup";
       state.shootMoon = state.highBid === 400;
       const winningBidLabel = state.shootMoon ? `${state.highBid} • Moon bid` : state.highBid;
@@ -3412,13 +3635,13 @@
       state.hands[player].push(...state.nest);
       state.nest = [];
       state.trump = chooseBestTrump(state.hands[player]);
-      const discards = chooseBotDiscards(state.hands[player], state.trump, 5);
+      const discards = chooseBotDiscards(state.hands[player], state.trump, discardCount());
       const discardIds = new Set(discards.map(card => card.id));
       state.nest = state.hands[player].filter(card => discardIds.has(card.id));
       state.hands[player] = state.hands[player].filter(card => !discardIds.has(card.id));
       sortHand(state.hands[player]);
       logMessage(`${playerName(player)} chooses ${trumpLabel()}.`);
-      beginPlay();
+      afterDiscardsReady();
     }
 
     function chooseBestTrump(hand) {
@@ -3475,16 +3698,16 @@
       if (state.phase !== "discard") return;
       if (state.selectedDiscards.has(cardId)) {
         state.selectedDiscards.delete(cardId);
-      } else if (state.selectedDiscards.size < 5) {
+      } else if (state.selectedDiscards.size < discardCount()) {
         state.selectedDiscards.add(cardId);
       } else {
-        showToast("Select exactly five cards");
+        showToast(`Select exactly ${discardCount()} cards`);
       }
       renderAll();
     }
 
     function confirmDiscards() {
-      if (state.phase !== "discard" || state.selectedDiscards.size !== 5 || state.animatingPlay) return;
+      if (state.phase !== "discard" || state.selectedDiscards.size !== discardCount() || state.animatingPlay) return;
       animateReturnedCardsToCenter();
     }
 
@@ -3547,8 +3770,71 @@
         sortHand(state.hands[0]);
         state.selectedDiscards.clear();
         state.animatingPlay = false;
-        beginPlay();
+        afterDiscardsReady();
       });
+    }
+
+    function afterDiscardsReady() {
+      if (settings.callPartner) {
+        state.phase = "callPartner";
+        setPrompt("Call your partner", "Choose one card. Its holder becomes your partner for this hand.");
+        renderAll();
+        requestAnimationFrame(openCallPartnerPicker);
+      } else {
+        beginPlay();
+      }
+    }
+
+    function openCallPartnerPicker() {
+      if (state.phase !== "callPartner") return;
+      const eligible = state.hands
+        .flatMap((hand, player) => player === 0 ? [] : hand.map(card => ({ card, player })))
+        .sort((a, b) => {
+          const suitOrder = { red: 0, yellow: 1, green: 2, black: 3, rook: 4 };
+          const suitDiff = suitOrder[a.card.rook ? "rook" : a.card.suit] - suitOrder[b.card.rook ? "rook" : b.card.suit];
+          return suitDiff || cardRank(b.card) - cardRank(a.card);
+        });
+
+      openTableDialog(`
+        <div class="kitty-panel-title">Call Your Partner</div>
+        <p class="call-partner-intro">Choose one card. The player holding it joins you for this hand.</p>
+        <div class="call-card-grid">
+          ${eligible.map(({ card }) => `
+            <button class="call-card-button" type="button" data-call-card="${card.id}" aria-label="Call ${escapeHtml(cardName(card))}">
+              ${cardHtml(card)}
+            </button>
+          `).join("")}
+        </div>
+      `, "call-partner-dialog");
+
+      els.tableDialog.querySelectorAll("[data-call-card]").forEach(button => {
+        button.addEventListener("click", () => selectCalledCard(button.dataset.callCard));
+      });
+    }
+
+    function selectCalledCard(cardId) {
+      if (state.phase !== "callPartner") return;
+      let holder = null;
+      let called = null;
+      state.hands.forEach((hand, player) => {
+        const found = hand.find(card => card.id === cardId);
+        if (found) {
+          holder = player;
+          called = { ...found };
+        }
+      });
+      if (holder === null || holder === 0 || !called) {
+        showToast("Choose a card held by another player");
+        return;
+      }
+      state.calledCard = called;
+      state.calledPartner = holder;
+      state.calledPartnerRevealed = false;
+      state.calledCardLeadBack = false;
+      closeTableDialog();
+      logMessage(`${playerName(0)} calls ${cardName(called)}. The holder is the partner for this hand.`);
+      showToast(`Called card: ${cardName(called)}`);
+      beginPlay();
     }
 
     function openTrumpPicker(isChange = false) {
@@ -3568,8 +3854,8 @@
           state.phase = "discard";
           const selectedCount = state.selectedDiscards.size;
           setPrompt(
-            "Return five cards to the nest",
-            selectedCount ? `${selectedCount} of 5 cards remain selected.` : "Select exactly five cards to return."
+            `Return ${discardCount()} cards to the nest`,
+            selectedCount ? `${selectedCount} of ${discardCount()} cards remain selected.` : `Select exactly ${discardCount()} cards to return.`
           );
           state.hands.forEach(sortHand);
           logMessage(`You choose ${trumpLabel()}.`);
@@ -3639,12 +3925,18 @@
       const index = state.hands[player].findIndex(card => card.id === cardId);
       if (index < 0) return;
       const [card] = state.hands[player].splice(index, 1);
+      if (settings.callPartner && state.calledCard && card.id === state.calledCard.id) {
+        state.calledPartnerRevealed = true;
+        state.calledCardLeadBack = false;
+        logMessage(`${playerName(player)} reveals the called card and is ${playerName(0)}'s partner.`);
+        showToast(`${playerName(player)} is your partner`);
+      }
       state.cardsPlayed += 1;
       state.animatingPlay = false;
       state.trick.push({ player, card });
       logMessage(`${playerName(player)} plays ${cardName(card)}.`);
 
-      if (state.trick.length === 4) {
+      if (state.trick.length === playerCount()) {
         const winner = trickWinner(state.trick);
         const cards = state.trick.map(play => play.card);
         const trickPoints = cards.reduce((sum, card) => sum + cardPoints(card), 0);
@@ -3654,9 +3946,9 @@
           winner,
           points: trickPoints
         };
-        state.tricksWon[TEAM_OF[winner]] += 1;
+        state.tricksWon[teamOf(winner)] += 1;
         state.tricksWonByPlayer[winner] += 1;
-        state.captured[TEAM_OF[winner]].push(...cards);
+        state.captured[teamOf(winner)].push(...cards);
         playSound("trick");
         renderAll();
         setPrompt(`${playerName(winner)} takes the trick`, `${trickPoints} counter points were in the trick.`);
@@ -3664,7 +3956,7 @@
         return;
       }
 
-      state.turn = (state.turn + 1) % 4;
+      state.turn = (state.turn + 1) % playerCount();
       renderAll();
       advanceTurn();
     }
@@ -3690,7 +3982,7 @@
     }
 
     function finishTrick(winner) {
-      if (state.phase !== "playing" || state.trick.length !== 4) return;
+      if (state.phase !== "playing" || state.trick.length !== playerCount()) return;
       state.trick = [];
       if (state.hands.every(hand => hand.length === 0)) {
         scoreHand();
@@ -3812,10 +4104,13 @@
     }
 
     function chooseBotCard(player, legal) {
+      const calledPartnerPlay = chooseCalledPartnerCard(player, legal);
+      if (calledPartnerPlay) return calledPartnerPlay;
+
       const protectedLegal = protectUncoveredFourteens(legal);
 
       if (state.shootMoon && player === state.highBidder) return chooseMoonBidderCard(player, protectedLegal);
-      if (state.shootMoon && TEAM_OF[player] === state.bidTeam && player !== state.highBidder) {
+      if (state.shootMoon && teamOf(player) === state.bidTeam && player !== state.highBidder) {
         return chooseMoonPartnerCard(player, protectedLegal);
       }
 
@@ -3823,7 +4118,8 @@
       if (rookCapture) return rookCapture;
 
       const profile = aiProfile();
-      if (player !== 2 && profile.mistakeChance > 0 && Math.random() < profile.mistakeChance) {
+      const isPartner = isCurrentPartner(player);
+      if (!isPartner && profile.mistakeChance > 0 && Math.random() < profile.mistakeChance) {
         return chooseCasualBotCard(protectedLegal);
       }
 
@@ -3834,10 +4130,10 @@
       }
 
       const currentWinner = trickWinner(state.trick);
-      const partnerWinning = TEAM_OF[currentWinner] === TEAM_OF[player];
+      const partnerWinning = teamOf(currentWinner) === teamOf(player);
       const leadSuit = effectiveSuit(state.trick[0].card);
       const winningPlay = state.trick.find(play => play.player === currentWinner);
-      const partnerPool = player === 2 ? partnerCardPool(protectedLegal) : protectedLegal;
+      const partnerPool = isPartner ? partnerCardPool(protectedLegal) : protectedLegal;
       const winningCards = partnerPool.filter(card => beats(card, winningPlay.card, leadSuit));
 
       const forcedTrump = choosePartnerTrumpTakeover(player, partnerPool, currentWinner, winningPlay.card, leadSuit);
@@ -3859,7 +4155,7 @@
         return lowestSafeDiscard(partnerPool);
       }
 
-      if (player === 2 && winningCards.length) {
+      if (isPartner && winningCards.length) {
         const one = winningCards.find(card => !card.rook && card.value === 1);
         if (one) return one;
 
@@ -3880,11 +4176,48 @@
       return lowestSafeDiscard(partnerPool);
     }
 
+    function chooseCalledPartnerCard(player, legal) {
+      if (!settings.callPartner || player !== state.calledPartner || !state.calledCard) return null;
+      const called = state.hands[player].find(card => card.id === state.calledCard.id);
+      if (!called) return null;
+
+      if (!state.trick.length) {
+        if (state.calledCardLeadBack && legal.some(card => card.id === called.id)) {
+          state.calledCardLeadBack = false;
+          return called;
+        }
+        return null;
+      }
+
+      const userLead = state.trick[0];
+      if (userLead.player !== 0) return null;
+      if (effectiveSuit(userLead.card) !== effectiveSuit(called)) return null;
+      if (cardRank(userLead.card) >= cardRank(called)) return null;
+      if (!legal.some(card => card.id === called.id)) return null;
+
+      const leadSuit = effectiveSuit(userLead.card);
+      const currentWinner = trickWinner(state.trick);
+      const winningPlay = state.trick.find(play => play.player === currentWinner);
+      const lowerSecureWinners = legal.filter(card =>
+        card.id !== called.id
+        && cardRank(card) < cardRank(called)
+        && beats(card, winningPlay.card, leadSuit)
+        && cardWinLooksSecure(player, card, leadSuit)
+      );
+
+      if (lowerSecureWinners.length) {
+        state.calledCardLeadBack = true;
+        return lowestWinningCard(lowerSecureWinners);
+      }
+
+      return called;
+    }
+
     function chooseRookCapture(player, legal) {
       if (!state.trick.length || !state.trick.some(play => play.card.rook)) return null;
 
       const currentWinner = trickWinner(state.trick);
-      if (TEAM_OF[currentWinner] === TEAM_OF[player]) return null;
+      if (teamOf(currentWinner) === teamOf(player)) return null;
 
       const leadSuit = effectiveSuit(state.trick[0].card);
       const winningPlay = state.trick.find(play => play.player === currentWinner);
@@ -3903,13 +4236,13 @@
     }
 
     function protectUncoveredFourteens(legal) {
-      if (state.trick.length === 3) return legal;
+      if (state.trick.length === playerCount() - 1) return legal;
       const withoutGuardedFourteens = legal.filter(card => !isGuardedFourteen(card));
       return withoutGuardedFourteens.length ? withoutGuardedFourteens : legal;
     }
 
     function choosePartnerTrumpTakeover(player, legal, currentWinner, winningCard, leadSuit) {
-      if (player !== 2 || state.trump === "none") return null;
+      if (!isCurrentPartner(player) || state.trump === "none") return null;
 
       const userPlayed = state.trick.some(play => play.player === 0);
       if (!userPlayed || currentWinner === 0) return null;
@@ -3922,10 +4255,10 @@
     }
 
     function choosePartnerOpeningTrumpReturn(player, legal) {
-      if (player !== 2 || state.trump === "none" || state.cardsPlayed !== 4) return null;
-      if (!state.lastTrick || state.lastTrick.winner !== 2) return null;
+      if (!isCurrentPartner(player) || state.trump === "none" || state.cardsPlayed !== playerCount()) return null;
+      if (!state.lastTrick || state.lastTrick.winner !== player) return null;
 
-      const winningPlay = state.lastTrick.plays.find(play => play.player === 2);
+      const winningPlay = state.lastTrick.plays.find(play => play.player === player);
       if (!winningPlay || effectiveSuit(winningPlay.card) !== state.trump) return null;
       if (cardRank(winningPlay.card) < 14) return null;
 
@@ -3984,9 +4317,9 @@
 
     function cardWinLooksSecure(player, winningCard, leadSuit) {
       const alreadyPlayed = new Set(state.trick.map(play => play.player));
-      for (let next = (player + 1) % 4; next !== state.leader; next = (next + 1) % 4) {
+      for (let next = (player + 1) % playerCount(); next !== state.leader; next = (next + 1) % playerCount()) {
         if (alreadyPlayed.has(next) || next === player) continue;
-        if (TEAM_OF[next] === TEAM_OF[player]) continue;
+        if (teamOf(next) === teamOf(player)) continue;
         const hand = state.hands[next];
         const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
         const choices = followers.length ? followers : hand;
@@ -3997,9 +4330,9 @@
 
     function partnerWinLooksSecure(player, winningCard, leadSuit) {
       const alreadyPlayed = new Set(state.trick.map(play => play.player));
-      for (let next = (player + 1) % 4; next !== state.leader; next = (next + 1) % 4) {
+      for (let next = (player + 1) % playerCount(); next !== state.leader; next = (next + 1) % playerCount()) {
         if (alreadyPlayed.has(next) || next === player) continue;
-        if (TEAM_OF[next] === TEAM_OF[player]) continue;
+        if (teamOf(next) === teamOf(player)) continue;
         const hand = state.hands[next];
         const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
         const choices = followers.length ? followers : hand;
@@ -4009,7 +4342,7 @@
     }
 
     function wouldSetBiddingTeam(player, card) {
-      const team = TEAM_OF[player];
+      const team = teamOf(player);
       if (team === state.bidTeam) return false;
       const captured = state.captured[team].reduce((sum, item) => sum + cardPoints(item), 0);
       const trickPoints = state.trick.reduce((sum, play) => sum + cardPoints(play.card), 0) + cardPoints(card);
@@ -4017,6 +4350,13 @@
     }
 
     function chooseLeadCard(player, legal) {
+      if (settings.callPartner && player === state.calledPartner && state.calledCardLeadBack && state.calledCard) {
+        const called = legal.find(card => card.id === state.calledCard.id);
+        if (called) {
+          state.calledCardLeadBack = false;
+          return called;
+        }
+      }
       const hand = state.hands[player];
       const suitGroups = {};
       for (const card of hand) {
@@ -4064,7 +4404,9 @@
         if (!topOwners.every(owner => owner === 0)) return false;
       }
 
-      const opposingTrumps = state.hands[1].concat(state.hands[2], state.hands[3])
+      const opposingTrumps = state.hands
+        .filter((hand, player) => player !== 0)
+        .flat()
         .some(card => effectiveSuit(card) === state.trump);
       const myTrumps = state.hands[0].filter(card => effectiveSuit(card) === state.trump);
       const totalTrumps = allCards.filter(entry => effectiveSuit(entry.card) === state.trump);
@@ -4090,7 +4432,7 @@
       }
       els.claimRevealTable.innerHTML = `
         ${state.hands.map((hand, player) => `
-          <div class="claim-table-hand ${POSITIONS[player]}">
+          <div class="claim-table-hand ${POSITIONS[player]} claim-player-${player}">
             <div class="claim-table-name">${escapeHtml(playerName(player))}</div>
             <div class="claim-table-cards">
               ${hand.map(card => cardHtml(card, "claim-table-card")).join("")}
@@ -4125,18 +4467,22 @@
       state.finalHandPoints = [0, 0];
 
       const handPoints = [0, 0];
-      const changes = [0, 0];
-      changes[state.bidTeam] = -state.highBid;
-      state.scores[state.bidTeam] += changes[state.bidTeam];
+      const teamChanges = [0, 0];
+      teamChanges[state.bidTeam] = -state.highBid;
+      const changes = scoreChangesForPlayers(teamChanges);
+      applyScoreChanges(changes);
 
       const completedHand = {
         hand: state.handNumber,
         points: [...handPoints],
+        teamChanges: [...teamChanges],
         changes: [...changes],
         totals: [...state.scores],
         bid: state.highBid,
         bidder: state.highBidder,
         bidTeam: state.bidTeam,
+        calledCard: state.calledCard ? { ...state.calledCard } : null,
+        calledPartner: state.calledPartner,
         shootMoon: state.shootMoon,
         tricksWon: [...state.tricksWon],
         tricksWonByPlayer: [...state.tricksWonByPlayer],
@@ -4162,32 +4508,36 @@
 
     function scoreHand() {
       state.phase = "scoring";
-      const nestTeam = TEAM_OF[state.lastTrickWinner ?? state.highBidder];
+      const nestTeam = teamOf(state.lastTrickWinner ?? state.highBidder);
       state.captured[nestTeam].push(...state.nest);
       const handPoints = [0, 1].map(team => state.captured[team].reduce((sum, card) => sum + cardPoints(card), 0));
       handPoints[nestTeam] += 20;
       state.finalHandPoints = [...handPoints];
 
-      const changes = [handPoints[0], handPoints[1]];
+      const teamChanges = [handPoints[0], handPoints[1]];
       const madeBid = state.shootMoon
-        ? state.tricksWonByPlayer[state.highBidder] === 10
+        ? state.tricksWonByPlayer[state.highBidder] === totalTricksInHand()
         : handPoints[state.bidTeam] >= state.highBid;
       if (state.shootMoon) {
-        changes[state.bidTeam] = madeBid ? state.highBid : -state.highBid;
-        if (madeBid) changes[1 - state.bidTeam] = 0;
+        teamChanges[state.bidTeam] = madeBid ? state.highBid : -state.highBid;
+        if (madeBid) teamChanges[1 - state.bidTeam] = 0;
       } else if (!madeBid) {
-        changes[state.bidTeam] = -state.highBid;
+        teamChanges[state.bidTeam] = -state.highBid;
       }
-      state.scores[0] += changes[0];
-      state.scores[1] += changes[1];
+
+      const changes = scoreChangesForPlayers(teamChanges);
+      applyScoreChanges(changes);
       const completedHand = {
         hand: state.handNumber,
         points: [...handPoints],
+        teamChanges: [...teamChanges],
         changes: [...changes],
         totals: [...state.scores],
         bid: state.highBid,
         bidder: state.highBidder,
         bidTeam: state.bidTeam,
+        calledCard: state.calledCard ? { ...state.calledCard } : null,
+        calledPartner: state.calledPartner,
         shootMoon: state.shootMoon,
         tricksWon: [...state.tricksWon],
         tricksWonByPlayer: [...state.tricksWonByPlayer],
@@ -4220,39 +4570,53 @@
     }
 
     function determineGameWinner() {
-      const reached = [0, 1].filter(team => state.scores[team] >= settings.winScore);
+      const reached = state.scores
+        .map((score, index) => ({ score, index }))
+        .filter(entry => entry.score >= settings.winScore);
       if (!reached.length) return null;
-      if (reached.length === 1) return reached[0];
-      if (state.scores[0] === state.scores[1]) return null;
-      return state.scores[0] > state.scores[1] ? 0 : 1;
+      const bestScore = Math.max(...reached.map(entry => entry.score));
+      const leaders = reached.filter(entry => entry.score === bestScore);
+      return leaders.length === 1 ? leaders[0].index : null;
     }
 
     function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false) {
+      const scoreCards = usesFixedTeamScoring()
+        ? [0, 1].map(team => `
+            <div class="summary-card">
+              <strong>${escapeHtml(teamName(team))}</strong>
+              <div class="big">${signed(changes[team])}</div>
+              <span>${points[team]} captured • Total ${state.scores[team]}</span>
+            </div>
+          `).join("")
+        : playerIndexes().map(player => `
+            <div class="summary-card">
+              <strong>${escapeHtml(playerName(player))}</strong>
+              <div class="big">${signed(changes[player])}</div>
+              <span>${points[teamOf(player)]} team points • Total ${state.scores[player]}</span>
+            </div>
+          `).join("");
+
+      const finalScores = state.scores
+        .map((score, index) => `${escapeHtml(scoreEntryName(index))} ${score}`)
+        .join(" • ");
       const winnerText = gameWinner === null ? "" : `
-        <p><strong>${teamName(gameWinner)} wins the game!</strong></p>
-        <p class="final-score"><strong>Final score: ${state.scores[0]}–${state.scores[1]}</strong></p>
+        <p><strong>${escapeHtml(scoreEntryName(gameWinner))} wins the game!</strong></p>
+        <p class="final-score"><strong>Final score: ${finalScores}</strong></p>
       `;
+      const partnerSummary = settings.callPartner && state.calledCard && state.calledPartner !== null
+        ? `<p class="table-dialog-summary">Called ${escapeHtml(cardName(state.calledCard))} • Partner: ${escapeHtml(playerName(state.calledPartner))}</p>`
+        : "";
       const bidSummary = wentDown
-        ? `${teamName(state.bidTeam)} went down and loses ${state.highBid} points. No points are awarded to ${teamName(1 - state.bidTeam)}.`
+        ? `${teamName(state.bidTeam)} went down and loses ${state.highBid} points. The defenders receive no points.`
         : state.shootMoon
-          ? `${playerName(state.highBidder)} ${madeBid ? "took all 10 tricks and made" : "lost a trick and failed"} the ${state.highBid} moon bid.`
+          ? `${playerName(state.highBidder)} ${madeBid ? `took all ${totalTricksInHand()} tricks and made` : "lost a trick and failed"} the ${state.highBid} moon bid.`
           : `${teamName(state.bidTeam)} ${madeBid ? "made" : "did not make"} the ${state.highBid} bid.`;
       openTableDialog(`
         <div class="kitty-panel-title">${gameWinner === null ? `Hand ${state.handNumber} Complete` : "Game Over"}</div>
-        <p class="table-dialog-summary">${bidSummary}</p>
+        <p class="table-dialog-summary">${escapeHtml(bidSummary)}</p>
+        ${partnerSummary}
         ${winnerText}
-        <div class="summary-grid">
-          <div class="summary-card">
-            <strong>${teamName(0)}</strong>
-            <div class="big">${signed(changes[0])}</div>
-            <span>${points[0]} captured • Total ${state.scores[0]}</span>
-          </div>
-          <div class="summary-card">
-            <strong>${teamName(1)}</strong>
-            <div class="big">${signed(changes[1])}</div>
-            <span>${points[1]} captured • Total ${state.scores[1]}</span>
-          </div>
-        </div>
+        <div class="summary-grid">${scoreCards}</div>
         <div class="modal-actions">
           ${gameWinner === null
             ? `<button class="btn primary" id="nextHandButton">Deal Next Hand</button>`
@@ -4305,10 +4669,12 @@
         showToast("Hands can rotate only during bidding, before the first card is played");
         return;
       }
-      state.hands = [state.hands[3], state.hands[0], state.hands[1], state.hands[2]];
+      const count = playerCount();
+      const rotated = state.hands.map((_, index) => state.hands[(index - 1 + count) % count]);
+      state.hands = rotated;
       state.hands.forEach(sortHand);
-      state.dealRotation = (state.dealRotation + 1) % 4;
-      logMessage("All four dealt hands rotate clockwise. You now hold a different hand.");
+      state.dealRotation = (state.dealRotation + 1) % count;
+      logMessage(`All ${count} dealt hands rotate clockwise. You now hold a different hand.`);
       playSound("card");
       renderAll();
       if (state.currentBidder === 0) renderControls();
@@ -4323,7 +4689,7 @@
       els.modalBackdrop.dataset.locked = "false";
       els.modal.innerHTML = `
         <h2>Game settings</h2>
-        <p>Names update immediately. Rook rank and winning score apply to the current game, although changing the target during a game may change when it ends.</p>
+        <p>Names update immediately. Changing the number of players or Call Partner mode starts a new game.</p>
         <div class="settings-grid">
           <div class="field full">
             <label>Table theme</label>
@@ -4341,6 +4707,14 @@
                 <small>The same layout with blue felt and lighter controls</small>
               </label>
             </div>
+          </div>
+          <div class="field">
+            <label for="playerCountSetting">Players</label>
+            <select id="playerCountSetting">
+              <option value="3" ${settings.playerCount === 3 ? "selected" : ""}>3 players</option>
+              <option value="4" ${settings.playerCount === 4 ? "selected" : ""}>4 players</option>
+              <option value="5" ${settings.playerCount === 5 ? "selected" : ""}>5 players</option>
+            </select>
           </div>
           <div class="field">
             <label for="rookRankSetting">Rook rank</label>
@@ -4366,6 +4740,10 @@
             <label class="checkbox-setting" for="showStatsSetting">
               <input id="showStatsSetting" type="checkbox" ${settings.showStats ? "checked" : ""}>
               Game stats after two hands
+            </label>
+            <label class="checkbox-setting" for="callPartnerSetting">
+              <input id="callPartnerSetting" type="checkbox" ${settings.callPartner ? "checked" : ""}>
+              Call Partner
             </label>
           </div>
           <div class="field">
@@ -4400,20 +4778,24 @@
             <input id="userNameSetting" maxlength="18" value="${escapeHtml(settings.userName)}">
           </div>
           <div class="field">
-            <label for="leftNameSetting">Left opponent</label>
+            <label for="leftNameSetting">Bot 1</label>
             <input id="leftNameSetting" maxlength="18" value="${escapeHtml(settings.botNames[0])}">
           </div>
           <div class="field">
-            <label for="partnerNameSetting">Across — your partner</label>
+            <label for="partnerNameSetting">Bot 2</label>
             <input id="partnerNameSetting" maxlength="18" value="${escapeHtml(settings.botNames[1])}">
           </div>
-          <div class="field full">
-            <label for="rightNameSetting">Right opponent</label>
+          <div class="field">
+            <label for="rightNameSetting">Bot 3</label>
             <input id="rightNameSetting" maxlength="18" value="${escapeHtml(settings.botNames[2])}">
+          </div>
+          <div class="field">
+            <label for="fourthNameSetting">Bot 4</label>
+            <input id="fourthNameSetting" maxlength="18" value="${escapeHtml(settings.botNames[3])}">
           </div>
         </div>
         <div class="rules-note">
-          Card points: each 1 is 15, each 5 is 5, each 10 and 14 is 10, and the Rook is 20. The last trick adds 20, making 200 points per hand. Any bid above 200 is a moon bid and requires the bidder to personally win all 10 tricks.
+          Card points: each 1 is 15, each 5 is 5, each 10 and 14 is 10, and the Rook is 20. The last trick adds 20, making 200 points per hand. Four-player games use fixed partners unless Call Partner is enabled. Three-player, five-player, and Call Partner games keep individual totals; temporary teammates receive the same hand result. A 400 bid is a moon bid and requires the bidder to personally win every trick.
         </div>
         <div class="modal-actions">
           <button class="btn" id="cancelSettings">Cancel</button>
@@ -4429,6 +4811,8 @@
       document.getElementById("cancelSettings").addEventListener("click", closeModal);
       document.getElementById("saveSettings").addEventListener("click", () => {
         const oldRank = settings.rookRank;
+        const oldPlayerCount = settings.playerCount;
+        const oldCallPartner = settings.callPartner;
         const selectedScore = winSelect.value === "custom"
           ? Number(document.getElementById("customScoreSetting").value)
           : Number(winSelect.value);
@@ -4444,11 +4828,14 @@
           theme: document.querySelector('input[name="themeSetting"]:checked')?.value || "classic",
           soundEnabled: document.getElementById("soundEnabledSetting").checked,
           showStats: document.getElementById("showStatsSetting").checked,
+          callPartner: document.getElementById("callPartnerSetting").checked,
+          playerCount: Number(document.getElementById("playerCountSetting").value),
           userName: cleanName(document.getElementById("userNameSetting").value, DEFAULT_SETTINGS.userName),
           botNames: [
             cleanName(document.getElementById("leftNameSetting").value),
             cleanName(document.getElementById("partnerNameSetting").value),
-            cleanName(document.getElementById("rightNameSetting").value)
+            cleanName(document.getElementById("rightNameSetting").value),
+            cleanName(document.getElementById("fourthNameSetting").value)
           ]
         };
         saveSettings();
@@ -4457,6 +4844,13 @@
         }
         applyTheme(settings.theme);
         closeModal();
+        if (oldPlayerCount !== settings.playerCount || oldCallPartner !== settings.callPartner) {
+          startNewGame(false);
+          showToast(settings.callPartner
+            ? `${settings.playerCount}-player Call Partner game started`
+            : `${settings.playerCount}-player game started`);
+          return;
+        }
         if (activeGame && oldRank !== settings.rookRank) logMessage(`Rook rank changed to ${rookRankLabel()}.`);
         renderAll();
         showToast("Settings saved");
@@ -4472,7 +4866,7 @@
       }
       openConfirmModal(
         "Start a new game?",
-        "This clears both team scores and abandons the current hand.",
+        "This clears all scores and abandons the current hand.",
         "Start New Game",
         () => startNewGame(false)
       );
@@ -4530,7 +4924,9 @@
         ? (() => {
             const us = hands.reduce((sum, entry) => sum + Number(entry.points[0] || 0), 0) / hands.length;
             const them = hands.reduce((sum, entry) => sum + Number(entry.points[1] || 0), 0) / hands.length;
-            return `Average per hand — Us ${formatAverage(us)} • Them ${formatAverage(them)}`;
+            const leftLabel = usesFixedTeamScoring() ? "Us" : "Bidder side";
+            const rightLabel = usesFixedTeamScoring() ? "Them" : "Defenders";
+            return `Average per hand — ${leftLabel} ${formatAverage(us)} • ${rightLabel} ${formatAverage(them)}`;
           })()
         : "Average per hand — no completed hands yet.";
 
@@ -4603,12 +4999,14 @@
       renderControls();
       renderStatsTicker();
       els.rotateButton.disabled = !canRotateHands();
-      els.goDownButton.hidden = !(state.phase === "playing" && state.bidTeam === 0 && state.trick.length < 4);
+      els.goDownButton.hidden = !(state.phase === "playing" && state.bidTeam === 0 && state.trick.length < playerCount());
+      document.querySelector(".table-shell").dataset.playerCount = String(playerCount());
+      els.nestLabel.textContent = `${discardCount()}-card nest`;
       saveGameState();
     }
 
     function renderNames() {
-      [0,1,2,3].forEach(index => {
+      [0, 1, 2, 3, 4].forEach(index => {
         document.getElementById(`name${index}`).textContent = playerName(index);
         document.getElementById(`avatar${index}`).textContent = playerName(index).charAt(0).toUpperCase();
       });
@@ -4635,8 +5033,24 @@
       const currentHandPoints = state.finalHandPoints || [0, 1].map(team =>
         state.captured[team].reduce((sum, card) => sum + cardPoints(card), 0)
       );
-      els.team0Score.textContent = state.scores[0];
-      els.team1Score.textContent = state.scores[1];
+      const scoreboard = document.querySelector(".sidebar-scoreboard");
+      scoreboard.classList.toggle("individual", !usesFixedTeamScoring());
+
+      if (usesFixedTeamScoring()) {
+        els.scoreEntries.innerHTML = [0, 1].map(team => `
+          <div class="team-score ${team === 1 ? "opponents" : ""}">
+            <div class="sidebar-score-name">${escapeHtml(team === 0 ? "Us" : "Them")}</div>
+            <div class="score-value-wrap"><div class="score-value">${state.scores[team] || 0}</div></div>
+          </div>
+        `).join("");
+      } else {
+        els.scoreEntries.innerHTML = playerIndexes().map(player => `
+          <div class="team-score ${player === state.highBidder ? "bidder-score" : ""}">
+            <div class="sidebar-score-name">${escapeHtml(playerName(player))}</div>
+            <div class="score-value-wrap"><div class="score-value">${state.scores[player] || 0}</div></div>
+          </div>
+        `).join("");
+      }
 
       const bidderIsSet = state.bidTeam !== null
         && state.highBid > 0
@@ -4649,8 +5063,8 @@
           ));
 
       els.handPoints.forEach((element, player) => {
-        if (!element) return;
-        element.textContent = `This hand: ${currentHandPoints[TEAM_OF[player]]}`;
+        if (!element || player >= playerCount()) return;
+        element.textContent = `This hand: ${currentHandPoints[teamOf(player)]}`;
         element.classList.toggle("set", bidderIsSet && player === state.highBidder);
       });
 
@@ -4683,22 +5097,30 @@
     }
 
     function renderPlayers() {
-      for (let i = 0; i < 4; i++) {
+      const count = playerCount();
+      for (let i = 0; i < 5; i++) {
         const playerEl = document.getElementById(`player${i}`);
+        const activePlayer = i < count;
+        playerEl.hidden = !activePlayer;
+        if (!activePlayer) continue;
+
         playerEl.classList.toggle("active", state.phase === "bidding" ? i === 0 : state.phase === "playing" && state.turn === i);
         playerEl.classList.toggle("bid-winner", state.highBidder === i && ["pickup","kittyReveal","discard","chooseTrump","playing","scoring"].includes(state.phase));
         const detail = document.getElementById(`detail${i}`);
         const bidText = state.highBidder === i && state.highBid
           ? `Bid ${state.highBid}${state.shootMoon ? " • Moon" : ""}`
-          : "";
+          : settings.callPartner && state.calledPartnerRevealed && state.calledPartner === i
+            ? "Called partner"
+            : "";
         detail.textContent = bidText;
         detail.hidden = !bidText;
 
         if (i > 0) {
           const mini = document.getElementById(`mini${i}`);
           mini.innerHTML = "";
-          const count = ["dealing", "claimReveal"].includes(state.phase) ? 0 : Math.min(state.hands[i].length, 7);
-          for (let c = 0; c < count; c++) {
+          const hand = state.hands[i] || [];
+          const cardCount = ["dealing", "claimReveal"].includes(state.phase) ? 0 : Math.min(hand.length, 7);
+          for (let c = 0; c < cardCount; c++) {
             const back = document.createElement("span");
             back.className = "mini-back";
             mini.appendChild(back);
@@ -4708,28 +5130,39 @@
     }
 
     function renderTableInfo() {
+      let mainText = "";
       if (state.phase === "dealing") {
         els.trumpDot.style.background = "#777";
-        els.tableInfoText.textContent = "Dealing cards";
+        mainText = "Dealing cards";
       } else if (!state.trump) {
         els.trumpDot.style.background = "#777";
-        els.tableInfoText.textContent = state.phase === "bidding"
+        mainText = state.phase === "bidding"
           ? `Set bid • ${state.bidCandidate}`
           : state.phase === "kittyReveal"
             ? "Kitty"
             : "No trump selected";
       } else if (state.trump === "none") {
         els.trumpDot.style.background = "#777";
-        els.tableInfoText.textContent = "No Trump";
+        mainText = "No Trump";
       } else {
         els.trumpDot.style.background = `var(--${state.trump})`;
-        els.tableInfoText.textContent = `${SUIT_LABELS[state.trump]} trump`;
+        mainText = `${SUIT_LABELS[state.trump]} trump`;
       }
+      const calledText = settings.callPartner && state.calledCard
+        ? `<span class="called-card-note">Called: ${escapeHtml(cardName(state.calledCard))}${state.calledPartnerRevealed ? ` • ${escapeHtml(playerName(state.calledPartner))}` : ""}</span>`
+        : "";
+      els.tableInfoText.innerHTML = `${escapeHtml(mainText)}${calledText}`;
     }
 
     function renderTrick() {
-      for (let i = 0; i < 4; i++) {
+      const count = playerCount();
+      for (let i = 0; i < 5; i++) {
         const slot = document.getElementById(`slot${i}`);
+        slot.hidden = i >= count;
+        if (i >= count) {
+          slot.innerHTML = "";
+          continue;
+        }
         const play = state.trick.find(entry => entry.player === i);
         slot.innerHTML = play ? cardHtml(play.card, "played-card") : "";
       }
@@ -4808,14 +5241,11 @@
       if (state.phase === "bidding") {
         const minBid = 100;
         state.bidCandidate = normalizeBidValue(state.bidCandidate, minBid);
-        const minusLabel = state.bidCandidate >= 400 ? "−200" : "−5";
-        const plusLabel = state.bidCandidate === 200 ? "+200" : "+5";
         const picker = document.createElement("div");
-        picker.className = "bid-picker";
+        picker.className = "bid-picker direct-bid-picker";
         picker.innerHTML = `
-          <button class="btn small" id="bidMinus" ${state.bidCandidate <= minBid ? "disabled" : ""}>${minusLabel}</button>
+          <label class="bid-entry-label" for="bidValueInput">Your bid</label>
           <input class="bid-value-input" id="bidValueInput" type="number" min="${minBid}" max="400" step="5" value="${state.bidCandidate}" aria-label="Bid amount">
-          <button class="btn small" id="bidPlus" ${state.bidCandidate >= 400 ? "disabled" : ""}>${plusLabel}</button>
         `;
         els.controls.appendChild(picker);
 
@@ -4823,19 +5253,14 @@
         const commitInput = () => {
           state.bidCandidate = normalizeBidValue(input.value, minBid);
           input.value = state.bidCandidate;
+          els.bidWinnerValue.textContent = state.bidCandidate;
         };
         input.addEventListener("focus", () => input.select());
         input.addEventListener("input", () => {
           const value = Number(input.value);
-          if (Number.isFinite(value)) {
-            state.bidCandidate = value;
-            els.bidWinnerValue.textContent = value;
-          }
+          if (Number.isFinite(value)) els.bidWinnerValue.textContent = value;
         });
-        input.addEventListener("change", () => {
-          commitInput();
-          renderAll();
-        });
+        input.addEventListener("change", commitInput);
         input.addEventListener("keydown", event => {
           if (event.key === "Enter") {
             event.preventDefault();
@@ -4843,24 +5268,29 @@
             takeSelectedBid();
           }
         });
-        picker.querySelector("#bidMinus").addEventListener("click", () => {
-          state.bidCandidate = previousBidValue(state.bidCandidate, minBid);
-          renderAll();
-        });
-        picker.querySelector("#bidPlus").addEventListener("click", () => {
-          state.bidCandidate = nextBidValue(state.bidCandidate);
-          renderAll();
-        });
-        addControlButton(`Take Bid ${state.bidCandidate}`, "primary", () => {
+
+        const actionGroup = document.createElement("div");
+        actionGroup.className = "bid-action-group";
+        const takeButton = document.createElement("button");
+        takeButton.className = "btn primary";
+        takeButton.textContent = "Take Bid";
+        takeButton.addEventListener("click", () => {
           commitInput();
           takeSelectedBid();
         });
+        const bitterButton = document.createElement("button");
+        bitterButton.className = "btn bitter-bunch";
+        bitterButton.textContent = "Bitter Bunch";
+        bitterButton.title = "Throw in all hands and redeal";
+        bitterButton.addEventListener("click", bitterBunch);
+        actionGroup.append(takeButton, bitterButton);
+        els.controls.appendChild(actionGroup);
         return;
       }
 
       if (state.phase === "discard") {
         const count = state.selectedDiscards.size;
-        addControlButton(`Return ${count}/5 to Nest`, count === 5 ? "primary" : "", confirmDiscards, count !== 5);
+        addControlButton(`Return ${count}/${discardCount()} to Nest`, count === discardCount() ? "primary" : "", confirmDiscards, count !== discardCount());
         addControlButton("Change Trump", "", () => openTrumpPicker(true));
         return;
       }
@@ -4979,7 +5409,7 @@
       showToast("Saved game resumed");
       resumeSavedGame();
     } else {
-      setPrompt("Welcome to Rook", "Start a new game to deal the cards.");
+      setPrompt("Welcome to Rook Solitaire", "Start a new game to deal the cards.");
     }
   </script>
 </body>
