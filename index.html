@@ -4107,7 +4107,8 @@
       const calledPartnerPlay = chooseCalledPartnerCard(player, legal);
       if (calledPartnerPlay) return calledPartnerPlay;
 
-      const protectedLegal = protectUncoveredFourteens(legal);
+      const calledCardProtected = protectCalledPartnerCard(player, legal);
+      const protectedLegal = protectUncoveredFourteens(calledCardProtected);
 
       if (state.shootMoon && player === state.highBidder) return chooseMoonBidderCard(player, protectedLegal);
       if (state.shootMoon && teamOf(player) === state.bidTeam && player !== state.highBidder) {
@@ -4198,19 +4199,43 @@
       const leadSuit = effectiveSuit(userLead.card);
       const currentWinner = trickWinner(state.trick);
       const winningPlay = state.trick.find(play => play.player === currentWinner);
-      const lowerSecureWinners = legal.filter(card =>
+      const lowerCertainWinners = legal.filter(card =>
         card.id !== called.id
         && cardRank(card) < cardRank(called)
         && beats(card, winningPlay.card, leadSuit)
-        && cardWinLooksSecure(player, card, leadSuit)
+        && calledPartnerCardIsCertainWinner(player, card, leadSuit)
       );
 
-      if (lowerSecureWinners.length) {
+      if (lowerCertainWinners.length) {
         state.calledCardLeadBack = true;
-        return lowestWinningCard(lowerSecureWinners);
+        return lowestWinningCard(lowerCertainWinners);
       }
 
       return called;
+    }
+
+    function calledPartnerCardIsCertainWinner(player, candidate, leadSuit) {
+      const playersYetToPlay = [];
+      let next = (player + 1) % playerCount();
+      while (next !== state.leader) {
+        if (!state.trick.some(play => play.player === next)) playersYetToPlay.push(next);
+        next = (next + 1) % playerCount();
+      }
+
+      for (const opponent of playersYetToPlay) {
+        const hand = state.hands[opponent];
+        const following = hand.filter(card => effectiveSuit(card) === leadSuit);
+        const legalResponses = following.length ? following : hand;
+        if (legalResponses.some(card => beats(card, candidate, leadSuit))) return false;
+      }
+
+      return true;
+    }
+
+    function protectCalledPartnerCard(player, legal) {
+      if (!settings.callPartner || player !== state.calledPartner || !state.calledCard) return legal;
+      const alternatives = legal.filter(card => card.id !== state.calledCard.id);
+      return alternatives.length ? alternatives : legal;
     }
 
     function chooseRookCapture(player, legal) {
