@@ -2452,8 +2452,11 @@
       line-height: 1.25;
     }
     body[data-theme="casual"] .called-card-note { color: #17649e; }
-    .call-partner-dialog {
+    .table-dialog.call-partner-dialog {
+      top: 12px;
       width: min(760px, 92%);
+      max-height: calc(100% - 150px);
+      transform: translateX(-50%);
     }
     .call-partner-intro {
       margin: 0 0 10px;
@@ -2462,7 +2465,7 @@
       font-size: 12px;
     }
     .call-card-grid {
-      max-height: min(390px, 52vh);
+      max-height: min(310px, 39vh);
       overflow: auto;
       display: grid;
       grid-template-columns: repeat(9, minmax(50px, 1fr));
@@ -4151,21 +4154,27 @@
     }
 
     function chooseMoonPartnerCard(player, legal) {
-      if (!state.trick.length) return lowestSafeDiscard(legal);
+      if (!state.trick.length) return chooseLeadCard(player, legal);
+
       const leadSuit = effectiveSuit(state.trick[0].card);
       const currentWinner = trickWinner(state.trick);
       const winningPlay = state.trick.find(play => play.player === currentWinner);
-      const losingCards = legal.filter(card => !beats(card, winningPlay.card, leadSuit));
-      if (losingCards.length) {
-        if (currentWinner === state.highBidder) {
-          const counters = losingCards.filter(card => cardPoints(card) > 0);
-          if (counters.length) {
-            return [...counters].sort((a, b) => cardPoints(b) - cardPoints(a) || cardRank(a) - cardRank(b))[0];
-          }
-        }
-        return lowestSafeDiscard(losingCards);
+      const ourTeamWinning = teamOf(currentWinner) === state.bidTeam;
+      const winningCards = legal.filter(card => beats(card, winningPlay.card, leadSuit));
+
+      if (!ourTeamWinning && winningCards.length) {
+        return lowestWinningCard(winningCards);
       }
-      return lowestWinningCard(legal);
+
+      const losingCards = legal.filter(card => !beats(card, winningPlay.card, leadSuit));
+      if (ourTeamWinning && losingCards.length) {
+        const counters = losingCards.filter(card => cardPoints(card) > 0);
+        if (counters.length) {
+          return [...counters].sort((a, b) => cardPoints(b) - cardPoints(a) || cardRank(a) - cardRank(b))[0];
+        }
+      }
+
+      return losingCards.length ? lowestSafeDiscard(losingCards) : lowestWinningCard(legal);
     }
 
     function chooseBotCard(player, legal) {
@@ -4638,8 +4647,9 @@
       state.finalHandPoints = [...handPoints];
 
       const teamChanges = [handPoints[0], handPoints[1]];
+      const totalAvailablePoints = handPoints[0] + handPoints[1];
       const madeBid = state.shootMoon
-        ? state.tricksWonByPlayer[state.highBidder] === totalTricksInHand()
+        ? handPoints[state.bidTeam] === totalAvailablePoints
         : handPoints[state.bidTeam] >= state.highBid;
       if (state.shootMoon) {
         teamChanges[state.bidTeam] = madeBid ? state.highBid : -state.highBid;
@@ -4675,8 +4685,8 @@
       logMessage(`${teamName(nestTeam)} earns the 20-point last trick bonus and the nest.`);
       logMessage(state.shootMoon
         ? (madeBid
-          ? `${playerName(state.highBidder)} takes every trick and makes the ${state.highBid} moon bid.`
-          : `${playerName(state.highBidder)} loses a trick and is set ${state.highBid} points.`)
+          ? `${teamName(state.bidTeam)} captures all ${totalAvailablePoints} points and makes the ${state.highBid} moon bid.`
+          : `${teamName(state.bidTeam)} leaves points for the defenders and is set ${state.highBid} points.`)
         : (madeBid
           ? `${teamName(state.bidTeam)} makes the ${state.highBid} bid.`
           : `${teamName(state.bidTeam)} is set and loses ${state.highBid} points.`));
@@ -4703,6 +4713,7 @@
     }
 
     function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false) {
+      const totalAvailablePoints = points.reduce((sum, value) => sum + Number(value || 0), 0);
       const scoreCards = usesFixedTeamScoring()
         ? [0, 1].map(team => `
             <div class="summary-card">
@@ -4732,7 +4743,7 @@
       const bidSummary = wentDown
         ? `${teamName(state.bidTeam)} went down and loses ${state.highBid} points. The defenders receive no points.`
         : state.shootMoon
-          ? `${playerName(state.highBidder)} ${madeBid ? `took all ${totalTricksInHand()} tricks and made` : "lost a trick and failed"} the ${state.highBid} moon bid.`
+          ? `${teamName(state.bidTeam)} ${madeBid ? `captured all ${totalAvailablePoints} points and made` : "did not capture every point and failed"} the ${state.highBid} moon bid.`
           : `${teamName(state.bidTeam)} ${madeBid ? "made" : "did not make"} the ${state.highBid} bid.`;
       openTableDialog(`
         <div class="kitty-panel-title">${gameWinner === null ? `Hand ${state.handNumber} Complete` : "Game Over"}</div>
@@ -4918,7 +4929,7 @@
           </div>
         </div>
         <div class="rules-note">
-          Card points: each 1 is 15, each 5 is 5, each 10 and 14 is 10, and the Rook is 20. The last trick adds 20, making 200 points per hand. Four-player games use fixed partners unless Call Partner is enabled. Three-player, five-player, and Call Partner games keep individual totals; temporary teammates receive the same hand result. A 400 bid is a moon bid and requires the bidder to personally win every trick.
+          Card points: each 1 is 15, each 5 is 5, each 10 and 14 is 10, and the Rook is 20. The last trick adds 20, making 200 points per hand. Four-player games use fixed partners unless Call Partner is enabled. Three-player, five-player, and Call Partner games keep individual totals; temporary teammates receive the same hand result. A 400 bid is a moon bid and succeeds when the bidder's temporary team captures all 200 points in the hand.
         </div>
         <div class="modal-actions">
           <button class="btn" id="cancelSettings">Cancel</button>
