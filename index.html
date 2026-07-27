@@ -2480,9 +2480,35 @@
     }
     .bid-action-group {
       display: flex;
+      align-items: center;
       gap: 9px;
     }
     .bid-action-group .btn { min-width: 130px; }
+    .hand-estimate {
+      min-width: 102px;
+      padding: 9px 12px;
+      border: 1px solid rgba(229,183,79,.28);
+      border-radius: 10px;
+      background: rgba(0,0,0,.22);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 900;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .hand-estimate small {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--muted);
+      font-size: 8px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    body[data-theme="casual"] .hand-estimate {
+      border-color: rgba(22,68,105,.18);
+      background: rgba(255,255,255,.75);
+      color: #1d5e91;
+    }
     .bitter-bunch {
       color: #f4dfb0;
       border-color: rgba(244,223,176,.28);
@@ -2675,7 +2701,7 @@
       5: { handSize: 8, nestSize: 5 }
     };
 
-    const SETTINGS_VERSION = 14;
+    const SETTINGS_VERSION = 15;
     const GAME_SAVE_VERSION = 2;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
     const DEFAULT_SETTINGS = {
@@ -2753,6 +2779,7 @@
       calledPartner: null,
       calledPartnerRevealed: false,
       calledCardLeadBack: false,
+      calledPartnerTrumpReturn: false,
       lastTrickWinner: null,
       selectedDiscards: new Set(),
       prompt: "",
@@ -2807,7 +2834,9 @@
       const input = document.getElementById("bidValueInput");
       if (input) {
         input.focus();
-        input.select();
+        if (typeof input.showPicker === "function") {
+          try { input.showPicker(); } catch (error) { /* Browser may block programmatic opening. */ }
+        }
       }
     });
     els.modalBackdrop.addEventListener("click", event => {
@@ -2994,6 +3023,7 @@
         state.trumpHandRecord = restored.trumpHandRecord && Number.isFinite(Number(restored.trumpHandRecord.count))
           ? restored.trumpHandRecord
           : null;
+        state.calledPartnerTrumpReturn = restored.calledPartnerTrumpReturn === true;
         if (state.phase === "bidding" && state.highBidder === null && state.highBid <= 0) {
           state.bidCandidate = settings.bidStart;
         }
@@ -3260,6 +3290,7 @@
       state.calledPartner = null;
       state.calledPartnerRevealed = false;
       state.calledCardLeadBack = false;
+      state.calledPartnerTrumpReturn = false;
       state.lastTrickWinner = null;
       state.selectedDiscards = new Set();
       state.dealRotation = 0;
@@ -3368,7 +3399,8 @@
     function normalizeBidValue(value, minimum) {
       let bid = Number.isFinite(Number(value)) ? Number(value) : minimum;
       bid = Math.round(bid / 5) * 5;
-      return clamp(bid, minimum, 400);
+      bid = clamp(bid, minimum, 400);
+      return bid > 200 && bid < 400 ? 400 : bid;
     }
 
     function previousBidValue(value, minimum) {
@@ -3517,7 +3549,7 @@
       continueBidding();
     }
 
-    function estimateMaxBid(hand) {
+    function estimateMaxBid(hand, randomize = true) {
       const points = hand.reduce((sum, card) => sum + cardPoints(card), 0);
       const suitCounts = Object.fromEntries(SUITS.map(suit => [suit, 0]));
       const suitPower = Object.fromEntries(SUITS.map(suit => [suit, 0]));
@@ -3559,7 +3591,9 @@
       const elite = bestSuitPower >= 55 || (longest >= 6 && hasRook && aces >= 2) || (aces >= 3 && fourteens >= 2);
       const strongHandBoost = elite ? 25 : exceptional ? 14 : 0;
       const profile = aiProfile();
-      const jitter = Math.floor(Math.random() * profile.jitter) - Math.floor(profile.jitter * .65);
+      const jitter = randomize
+        ? Math.floor(Math.random() * profile.jitter) - Math.floor(profile.jitter * .65)
+        : 0;
       const estimate = 64 + points * 0.42 + topPower * 0.62 + colorStrength + rookBoost + strongHandBoost + jitter;
       const bidStrength = analyzeBotBidHand(hand);
 
@@ -3831,6 +3865,7 @@
       state.calledPartner = holder;
       state.calledPartnerRevealed = false;
       state.calledCardLeadBack = false;
+      state.calledPartnerTrumpReturn = false;
       closeTableDialog();
       logMessage(`${playerName(0)} calls ${cardName(called)}. The holder is the partner for this hand.`);
       showToast(`Called card: ${cardName(called)}`);
@@ -3928,6 +3963,8 @@
       if (settings.callPartner && state.calledCard && card.id === state.calledCard.id) {
         state.calledPartnerRevealed = true;
         state.calledCardLeadBack = false;
+        state.calledPartnerTrumpReturn = state.trump !== "none"
+          && state.hands[player].some(remaining => effectiveSuit(remaining) === state.trump);
         logMessage(`${playerName(player)} reveals the called card and is ${playerName(0)}'s partner.`);
         showToast(`${playerName(player)} is your partner`);
       }
@@ -4382,6 +4419,13 @@
           return called;
         }
       }
+      if (settings.callPartner && player === state.calledPartner && state.calledPartnerTrumpReturn) {
+        const trumps = legal.filter(card => effectiveSuit(card) === state.trump);
+        state.calledPartnerTrumpReturn = false;
+        if (trumps.length) {
+          return [...trumps].sort((a, b) => cardRank(b) - cardRank(a))[0];
+        }
+      }
       const hand = state.hands[player];
       const suitGroups = {};
       for (const card of hand) {
@@ -4751,7 +4795,7 @@
           </div>
           <div class="field">
             <label for="bidStartSetting">Default bid</label>
-            <input id="bidStartSetting" type="number" min="100" max="400" step="5" value="${settings.bidStart}">
+            <select id="bidStartSetting">${bidOptionsHtml(settings.bidStart)}</select>
           </div>
           <div class="field full settings-check-row">
             <label class="checkbox-setting" for="allowNoTrumpSetting">
@@ -5051,7 +5095,7 @@
       const editable = state.phase === "bidding" && state.highBidder === null;
       els.bidWinnerDisplay.disabled = !editable;
       els.bidWinnerDisplay.classList.toggle("editable", editable);
-      els.bidWinnerDisplay.title = editable ? "Click to type your bid" : "Current bid";
+      els.bidWinnerDisplay.title = editable ? "Click to choose your bid" : "Current bid";
     }
 
     function renderScores() {
@@ -5255,6 +5299,25 @@
       });
     }
 
+    function bidValues() {
+      const values = [];
+      for (let bid = 100; bid <= 200; bid += 5) values.push(bid);
+      values.push(400);
+      return values;
+    }
+
+    function bidOptionsHtml(selected) {
+      const normalized = normalizeBidValue(selected, 100);
+      return bidValues().map(value =>
+        `<option value="${value}" ${value === normalized ? "selected" : ""}>${value}</option>`
+      ).join("");
+    }
+
+    function estimatedHandTake(hand = state.hands[0]) {
+      if (!Array.isArray(hand) || !hand.length) return 100;
+      return Math.max(100, estimateMaxBid(hand, false));
+    }
+
     function renderControls() {
       els.controls.innerHTML = "";
       if (state.animatingPlay || state.phase === "dealing" || state.phase === "claimReveal" || state.phase === "kittyReveal") return;
@@ -5270,29 +5333,19 @@
         picker.className = "bid-picker direct-bid-picker";
         picker.innerHTML = `
           <label class="bid-entry-label" for="bidValueInput">Your bid</label>
-          <input class="bid-value-input" id="bidValueInput" type="number" min="${minBid}" max="400" step="5" value="${state.bidCandidate}" aria-label="Bid amount">
+          <select class="bid-value-input" id="bidValueInput" aria-label="Bid amount">
+            ${bidOptionsHtml(state.bidCandidate)}
+          </select>
         `;
         els.controls.appendChild(picker);
 
         const input = picker.querySelector("#bidValueInput");
         const commitInput = () => {
           state.bidCandidate = normalizeBidValue(input.value, minBid);
-          input.value = state.bidCandidate;
+          input.value = String(state.bidCandidate);
           els.bidWinnerValue.textContent = state.bidCandidate;
         };
-        input.addEventListener("focus", () => input.select());
-        input.addEventListener("input", () => {
-          const value = Number(input.value);
-          if (Number.isFinite(value)) els.bidWinnerValue.textContent = value;
-        });
         input.addEventListener("change", commitInput);
-        input.addEventListener("keydown", event => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commitInput();
-            takeSelectedBid();
-          }
-        });
 
         const actionGroup = document.createElement("div");
         actionGroup.className = "bid-action-group";
@@ -5303,12 +5356,16 @@
           commitInput();
           takeSelectedBid();
         });
+        const estimate = document.createElement("div");
+        estimate.className = "hand-estimate";
+        estimate.title = "Estimated bid strength for the hand currently in front of you, before the kitty";
+        estimate.innerHTML = `<small>Estimated</small>${estimatedHandTake()}`;
         const bitterButton = document.createElement("button");
         bitterButton.className = "btn bitter-bunch";
         bitterButton.textContent = "Bitter Bunch";
         bitterButton.title = "Throw in all hands and redeal";
         bitterButton.addEventListener("click", bitterBunch);
-        actionGroup.append(takeButton, bitterButton);
+        actionGroup.append(takeButton, estimate, bitterButton);
         els.controls.appendChild(actionGroup);
         return;
       }
