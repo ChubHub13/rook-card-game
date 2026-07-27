@@ -106,6 +106,14 @@
       letter-spacing: -0.03em;
     }
 
+    #reloadMark,
+    #reloadTitle { cursor: pointer; }
+    #reloadMark:focus-visible,
+    #reloadTitle:focus-visible {
+      outline: 2px solid var(--gold);
+      outline-offset: 3px;
+    }
+
     .brand p {
       color: var(--muted);
       font-size: 12px;
@@ -481,6 +489,19 @@
 
     .player-meta { min-width: 0; }
     .player-name { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .player.bidder-marker .player-name::after,
+    .player.called-partner-marker .player-name::after {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-left: 6px;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 50%;
+      background: #df3f3f;
+      box-shadow: 0 0 0 2px rgba(223,63,63,.18), 0 1px 4px rgba(0,0,0,.42);
+      vertical-align: 1px;
+    }
     .player-detail { font-size: 10px; color: var(--muted); white-space: nowrap; }
 
     .mini-cards {
@@ -2013,14 +2034,20 @@
     .bid-value-input {
       width: 108px;
       min-height: 45px;
-      border: 1px solid rgba(255,255,255,.2);
+      border: 1px solid rgba(84,62,22,.42);
       border-radius: 11px;
-      color: var(--gold);
-      background: rgba(0,0,0,.28);
+      color: #211b0d;
+      background: #f5ead0;
       font-size: 24px;
       font-weight: 950;
       text-align: center;
       outline: none;
+      color-scheme: light;
+    }
+    .bid-value-input option {
+      color: #211b0d;
+      background: #f5ead0;
+      font-weight: 800;
     }
     .bid-value-input:focus {
       border-color: var(--gold);
@@ -2088,8 +2115,12 @@
     body[data-theme="casual"] .bid-winner-display span { color: #61778a; }
     body[data-theme="casual"] .bid-value-input {
       color: #17324b;
-      border-color: rgba(22,68,105,.22);
-      background: rgba(255,255,255,.82);
+      border-color: rgba(22,68,105,.32);
+      background: #f7fbff;
+    }
+    body[data-theme="casual"] .bid-value-input option {
+      color: #17324b;
+      background: #f7fbff;
     }
     body[data-theme="casual"] .table-dialog {
       color: #17324b;
@@ -2453,15 +2484,24 @@
       background: rgba(229,183,79,.12);
     }
     .call-card-button .card {
-      width: 46px;
-      height: 66px;
+      --card-w: 46px;
+      width: var(--card-w);
+      height: calc(var(--card-w) * 1.42);
       margin: 0 auto;
+      border-width: 1px;
+      border-radius: 6px;
       pointer-events: none;
-      font-size: 9px;
     }
-    .call-card-button .corner { font-size: 8px; }
-    .call-card-button .card-number { font-size: 22px; }
-    .call-card-button .rook-bird { font-size: 22px; }
+    .call-card-button .card::after { inset: 3px; border-width: 1px; }
+    .call-card-button .corner { font-size: 9px; line-height: .84; }
+    .call-card-button .corner.top { top: 5px; left: 5px; }
+    .call-card-button .corner.bottom { bottom: 5px; right: 5px; }
+    .call-card-button .corner .pip { margin-top: 2px; font-size: 6px; }
+    .call-card-button .card-center { inset: 18% 8%; }
+    .call-card-button .big-value { font-size: 21px; line-height: .82; letter-spacing: -.12em; }
+    .call-card-button .suit-name { margin-top: 4px; font-size: 5px; letter-spacing: .08em; }
+    .call-card-button .rook-bird { width: 27px; height: 27px; font-size: 17px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.08), 0 2px 4px rgba(0,0,0,.25); }
+    .call-card-button .rook-label { margin-top: 4px; font-size: 6px; }
     @media (max-width: 760px) {
       .call-card-grid { grid-template-columns: repeat(6, minmax(46px, 1fr)); }
     }
@@ -2484,31 +2524,6 @@
       gap: 9px;
     }
     .bid-action-group .btn { min-width: 130px; }
-    .hand-estimate {
-      min-width: 102px;
-      padding: 9px 12px;
-      border: 1px solid rgba(229,183,79,.28);
-      border-radius: 10px;
-      background: rgba(0,0,0,.22);
-      color: var(--gold);
-      font-size: 12px;
-      font-weight: 900;
-      text-align: center;
-      white-space: nowrap;
-    }
-    .hand-estimate small {
-      display: block;
-      margin-bottom: 2px;
-      color: var(--muted);
-      font-size: 8px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-    }
-    body[data-theme="casual"] .hand-estimate {
-      border-color: rgba(22,68,105,.18);
-      background: rgba(255,255,255,.75);
-      color: #1d5e91;
-    }
     .bitter-bunch {
       color: #f4dfb0;
       border-color: rgba(244,223,176,.28);
@@ -2533,9 +2548,9 @@
   <main class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">R</div>
+        <div class="brand-mark" id="reloadMark" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">R</div>
         <div class="brand-copy">
-          <h1>ROOK SOLITAIRE</h1>
+          <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
           <p>Choose the hand you want to play</p>
         </div>
       </div>
@@ -2820,7 +2835,9 @@
       statsTicker: document.getElementById("statsTicker"),
       statsTickerText: document.getElementById("statsTickerText"),
       statsTickerCount: document.getElementById("statsTickerCount"),
-      nestLabel: document.getElementById("nestLabel")
+      nestLabel: document.getElementById("nestLabel"),
+      reloadMark: document.getElementById("reloadMark"),
+      reloadTitle: document.getElementById("reloadTitle")
     };
 
     els.startButton.addEventListener("click", () => startNewGame(false));
@@ -2830,6 +2847,16 @@
     els.rotateButton.addEventListener("click", rotateHands);
     els.claimRevealTable.addEventListener("click", finishClaimRest);
     els.kittyReveal.addEventListener("click", incorporateKitty);
+    const reloadGamePage = () => window.location.reload();
+    [els.reloadMark, els.reloadTitle].forEach(element => {
+      element.addEventListener("click", reloadGamePage);
+      element.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          reloadGamePage();
+        }
+      });
+    });
     els.bidWinnerDisplay.addEventListener("click", () => {
       const input = document.getElementById("bidValueInput");
       if (input) {
@@ -3964,7 +3991,8 @@
         state.calledPartnerRevealed = true;
         state.calledCardLeadBack = false;
         state.calledPartnerTrumpReturn = state.trump !== "none"
-          && state.hands[player].some(remaining => effectiveSuit(remaining) === state.trump);
+          && state.hands[player].some(remaining => effectiveSuit(remaining) === state.trump)
+          && defendersStillHoldTrump();
         logMessage(`${playerName(player)} reveals the called card and is ${playerName(0)}'s partner.`);
         showToast(`${playerName(player)} is your partner`);
       }
@@ -4411,21 +4439,47 @@
       return captured + trickPoints > 200 - state.highBid;
     }
 
+    function defendersStillHoldTrump() {
+      if (!settings.callPartner || !state.trump || state.trump === "none" || state.calledPartner === null) return false;
+      return playerIndexes().some(player =>
+        player !== state.highBidder
+        && player !== state.calledPartner
+        && state.hands[player].some(card => effectiveSuit(card) === state.trump)
+      );
+    }
+
+    function calledPartnerShouldAvoidTrumpLead(player) {
+      return settings.callPartner
+        && player === state.calledPartner
+        && state.trump
+        && state.trump !== "none"
+        && !defendersStillHoldTrump();
+    }
+
     function chooseLeadCard(player, legal) {
+      const avoidTrumpLead = calledPartnerShouldAvoidTrumpLead(player);
+
       if (settings.callPartner && player === state.calledPartner && state.calledCardLeadBack && state.calledCard) {
         const called = legal.find(card => card.id === state.calledCard.id);
-        if (called) {
+        if (called && (!avoidTrumpLead || effectiveSuit(called) !== state.trump)) {
           state.calledCardLeadBack = false;
           return called;
         }
       }
       if (settings.callPartner && player === state.calledPartner && state.calledPartnerTrumpReturn) {
-        const trumps = legal.filter(card => effectiveSuit(card) === state.trump);
         state.calledPartnerTrumpReturn = false;
-        if (trumps.length) {
-          return [...trumps].sort((a, b) => cardRank(b) - cardRank(a))[0];
+        if (!avoidTrumpLead) {
+          const trumps = legal.filter(card => effectiveSuit(card) === state.trump);
+          if (trumps.length) {
+            return [...trumps].sort((a, b) => cardRank(b) - cardRank(a))[0];
+          }
         }
       }
+
+      const nonTrumpLeads = avoidTrumpLead
+        ? legal.filter(card => effectiveSuit(card) !== state.trump)
+        : legal;
+      const leadPool = nonTrumpLeads.length ? nonTrumpLeads : legal;
       const hand = state.hands[player];
       const suitGroups = {};
       for (const card of hand) {
@@ -4433,7 +4487,7 @@
         (suitGroups[suit] ||= []).push(card);
       }
 
-      const sureWinners = legal.filter(card => {
+      const sureWinners = leadPool.filter(card => {
         const allOthers = state.hands.flatMap((h, i) => i === player ? [] : h);
         return !allOthers.some(other => {
           if (effectiveSuit(other) !== effectiveSuit(card)) return false;
@@ -4444,7 +4498,7 @@
         return [...sureWinners].sort((a, b) => cardPoints(b) - cardPoints(a) || cardRank(b) - cardRank(a))[0];
       }
 
-      const nonPoints = legal.filter(card => cardPoints(card) === 0 && effectiveSuit(card) !== state.trump);
+      const nonPoints = leadPool.filter(card => cardPoints(card) === 0 && effectiveSuit(card) !== state.trump);
       if (nonPoints.length) {
         return [...nonPoints].sort((a, b) => {
           const lengthDiff = suitGroups[effectiveSuit(b)].length - suitGroups[effectiveSuit(a)].length;
@@ -4452,7 +4506,7 @@
         })[0];
       }
 
-      return [...legal].sort((a, b) => cardRank(a) - cardRank(b))[0];
+      return [...leadPool].sort((a, b) => cardRank(a) - cardRank(b))[0];
     }
 
     function canClaimRest() {
@@ -5174,7 +5228,9 @@
         if (!activePlayer) continue;
 
         playerEl.classList.toggle("active", state.phase === "bidding" ? i === 0 : state.phase === "playing" && state.turn === i);
-        playerEl.classList.toggle("bid-winner", state.highBidder === i && ["pickup","kittyReveal","discard","chooseTrump","playing","scoring"].includes(state.phase));
+        playerEl.classList.toggle("bid-winner", state.highBidder === i && ["pickup","kittyReveal","discard","chooseTrump","callPartner","playing","scoring"].includes(state.phase));
+        playerEl.classList.toggle("bidder-marker", settings.callPartner && state.highBidder === i && state.highBid > 0);
+        playerEl.classList.toggle("called-partner-marker", settings.callPartner && state.calledPartnerRevealed && state.calledPartner === i);
         const detail = document.getElementById(`detail${i}`);
         const bidText = state.highBidder === i && state.highBid
           ? `Bid ${state.highBid}${state.shootMoon ? " • Moon" : ""}`
@@ -5313,11 +5369,6 @@
       ).join("");
     }
 
-    function estimatedHandTake(hand = state.hands[0]) {
-      if (!Array.isArray(hand) || !hand.length) return 100;
-      return Math.max(100, estimateMaxBid(hand, false));
-    }
-
     function renderControls() {
       els.controls.innerHTML = "";
       if (state.animatingPlay || state.phase === "dealing" || state.phase === "claimReveal" || state.phase === "kittyReveal") return;
@@ -5356,16 +5407,12 @@
           commitInput();
           takeSelectedBid();
         });
-        const estimate = document.createElement("div");
-        estimate.className = "hand-estimate";
-        estimate.title = "Estimated bid strength for the hand currently in front of you, before the kitty";
-        estimate.innerHTML = `<small>Estimated</small>${estimatedHandTake()}`;
         const bitterButton = document.createElement("button");
         bitterButton.className = "btn bitter-bunch";
         bitterButton.textContent = "Bitter Bunch";
         bitterButton.title = "Throw in all hands and redeal";
         bitterButton.addEventListener("click", bitterBunch);
-        actionGroup.append(takeButton, estimate, bitterButton);
+        actionGroup.append(takeButton, bitterButton);
         els.controls.appendChild(actionGroup);
         return;
       }
