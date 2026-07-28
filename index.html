@@ -4891,10 +4891,6 @@
       if (state.phase !== "playing" || state.turn !== 0 || state.trick.length !== 0 || state.hands[0].length === 0) return false;
       if (state.shootMoon && state.highBidder !== 0) return false;
 
-      const claimTeam = state.bidTeam ?? teamOf(0);
-      const teamPlayers = new Set(handTeamMembers(claimTeam));
-      if (!teamPlayers.has(0)) return false;
-
       const allCards = state.hands.flatMap((hand, player) => hand.map(card => ({ card, player })));
       const grouped = {};
       for (const entry of allCards) {
@@ -4902,23 +4898,26 @@
         (grouped[suit] ||= []).push(entry);
       }
 
-      // Treat the bidder and partner as one hand. In every color, their cards must
-      // occupy all of the highest remaining ranks that their combined holding needs.
+      // Use the original conservative claim rule: every card in the user's hand
+      // must be one of the highest remaining cards in its effective suit.
       for (const entries of Object.values(grouped)) {
-        const teamCardCount = entries.filter(entry => teamPlayers.has(entry.player)).length;
-        if (!teamCardCount) continue;
+        const mine = entries.filter(entry => entry.player === 0);
+        if (!mine.length) continue;
         entries.sort((a, b) => cardRank(b.card) - cardRank(a.card));
-        const topOwners = entries.slice(0, teamCardCount).map(entry => entry.player);
-        if (!topOwners.every(owner => teamPlayers.has(owner))) return false;
+        const topOwners = entries.slice(0, mine.length).map(entry => entry.player);
+        if (!topOwners.every(owner => owner === 0)) return false;
       }
 
-      // A defender with trump can still ruff an otherwise winning side color, so the
-      // claim is offered only when every remaining trump belongs to the bidder's team.
+      // A defender holding trump could still ruff a side-suit winner. Only offer
+      // the claim when every remaining trump is in the user's hand.
       if (state.trump && state.trump !== "none") {
-        const defenderHasTrump = allCards.some(entry =>
-          !teamPlayers.has(entry.player) && effectiveSuit(entry.card) === state.trump
-        );
-        if (defenderHasTrump) return false;
+        const opposingTrumps = state.hands
+          .filter((hand, player) => player !== 0)
+          .flat()
+          .some(card => effectiveSuit(card) === state.trump);
+        const myTrumps = state.hands[0].filter(card => effectiveSuit(card) === state.trump);
+        const totalTrumps = allCards.filter(entry => effectiveSuit(entry.card) === state.trump);
+        if (opposingTrumps && myTrumps.length !== totalTrumps.length) return false;
       }
 
       return true;
@@ -4954,15 +4953,14 @@
 
     function finishClaimRest() {
       if (state.phase !== "claimReveal") return;
-      const claimTeam = state.bidTeam ?? teamOf(0);
       const remainingTricks = state.hands[0].length;
       const remaining = state.hands.flatMap(hand => hand.splice(0));
-      state.tricksWon[claimTeam] += remainingTricks;
-      state.tricksWonByPlayer[state.highBidder ?? 0] += remainingTricks;
-      state.captured[claimTeam].push(...remaining);
-      state.lastTrickWinner = state.highBidder ?? 0;
+      state.tricksWon[0] += remainingTricks;
+      state.tricksWonByPlayer[0] += remainingTricks;
+      state.captured[0].push(...remaining);
+      state.lastTrickWinner = 0;
       state.trick = [];
-      logMessage(`${teamName(claimTeam)} claims all remaining tricks.`);
+      logMessage(`${playerName(0)} claims all remaining tricks.`);
       scoreHand();
     }
 
