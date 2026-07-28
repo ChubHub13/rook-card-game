@@ -28,6 +28,7 @@
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
     html, body {
       min-height: 100%;
@@ -99,11 +100,28 @@
       transform: rotate(-4deg);
     }
 
+    .brand-title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      min-width: 0;
+    }
+
     .brand h1 {
       font-size: clamp(17px, 1.8vw, 23px);
       line-height: 1;
       margin: 0 0 2px;
       letter-spacing: -0.03em;
+    }
+
+    .version-badge {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: .04em;
+      white-space: nowrap;
     }
 
     #reloadMark,
@@ -640,7 +658,7 @@
       flex: 0 0 var(--card-w);
       width: var(--card-w);
       height: var(--card-h);
-      margin-left: calc(var(--card-w) * -0.27);
+      margin-left: calc(var(--card-w) * var(--hand-overlap, -0.27));
       border: 2px solid #f0ebdb;
       border-radius: calc(var(--card-w) * .115);
       color: #20231f;
@@ -2789,6 +2807,26 @@
       }
       .call-card-button .card { --card-w: 39px; }
       .color-choice { min-height: 48px; font-size: 10px; }
+
+      /* The global confirmation modal lives outside .app, so rotate it separately. */
+      .modal-backdrop {
+        inset: auto;
+        left: 50%;
+        top: 50%;
+        width: 100vh;
+        width: 100dvh;
+        height: 100vw;
+        height: 100dvw;
+        padding: 10px;
+        transform: translate(-50%, -50%) rotate(90deg);
+        transform-origin: center;
+      }
+
+      .modal {
+        width: min(620px, calc(100% - 18px));
+        max-height: calc(100% - 18px);
+        padding: 14px;
+      }
     }
 
     @media (max-width: 760px) and (orientation: landscape) {
@@ -2856,7 +2894,10 @@
       <div class="brand">
         <div class="brand-mark" id="reloadMark" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">R</div>
         <div class="brand-copy">
-          <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
+          <div class="brand-title-row">
+            <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
+            <span class="version-badge" title="Version 1.0.0">v1.0.0</span>
+          </div>
           <p>Choose the hand you want to play</p>
         </div>
       </div>
@@ -4633,46 +4674,32 @@
         return null;
       }
 
-      const userLead = state.trick[0];
-      if (userLead.player !== 0) return null;
-      if (effectiveSuit(userLead.card) !== effectiveSuit(called)) return null;
-      if (cardRank(userLead.card) >= cardRank(called)) return null;
+      const bidderLead = state.trick[0];
+      if (bidderLead.player !== state.highBidder) return null;
+      if (effectiveSuit(bidderLead.card) !== effectiveSuit(called)) return null;
+      if (cardRank(bidderLead.card) >= cardRank(called)) return null;
       if (!legal.some(card => card.id === called.id)) return null;
 
-      const leadSuit = effectiveSuit(userLead.card);
-      const currentWinner = trickWinner(state.trick);
-      const winningPlay = state.trick.find(play => play.player === currentWinner);
-      const lowerCertainWinners = legal.filter(card =>
-        card.id !== called.id
-        && cardRank(card) < cardRank(called)
-        && beats(card, winningPlay.card, leadSuit)
-        && calledPartnerCardIsCertainWinner(player, card, leadSuit)
-      );
+      // The called card is the expected response. The only exception is when the
+      // called partner is fourth/last and a lower card is already guaranteed to win.
+      const playingLast = state.trick.length === playerCount() - 1;
+      if (playingLast) {
+        const leadSuit = effectiveSuit(bidderLead.card);
+        const currentWinner = trickWinner(state.trick);
+        const winningPlay = state.trick.find(play => play.player === currentWinner);
+        const lowerWinners = legal.filter(card =>
+          card.id !== called.id
+          && cardRank(card) < cardRank(called)
+          && beats(card, winningPlay.card, leadSuit)
+        );
 
-      if (lowerCertainWinners.length) {
-        state.calledCardLeadBack = true;
-        return lowestWinningCard(lowerCertainWinners);
+        if (lowerWinners.length) {
+          state.calledCardLeadBack = true;
+          return lowestWinningCard(lowerWinners);
+        }
       }
 
       return called;
-    }
-
-    function calledPartnerCardIsCertainWinner(player, candidate, leadSuit) {
-      const playersYetToPlay = [];
-      let next = (player + 1) % playerCount();
-      while (next !== state.leader) {
-        if (!state.trick.some(play => play.player === next)) playersYetToPlay.push(next);
-        next = (next + 1) % playerCount();
-      }
-
-      for (const opponent of playersYetToPlay) {
-        const hand = state.hands[opponent];
-        const following = hand.filter(card => effectiveSuit(card) === leadSuit);
-        const legalResponses = following.length ? following : hand;
-        if (legalResponses.some(card => beats(card, candidate, leadSuit))) return false;
-      }
-
-      return true;
     }
 
     function protectCalledPartnerCard(player, legal) {
@@ -5707,10 +5734,35 @@
       `;
     }
 
+    function configureHumanHandLayout(cardCount) {
+      els.hand.style.removeProperty("--card-w");
+      els.hand.style.removeProperty("--hand-overlap");
+
+      // A three-player bidder temporarily holds 21 cards after taking the
+      // nine-card kitty. Size and overlap them to the actual table width.
+      if (cardCount <= 12) return;
+
+      const zone = els.hand.closest(".hand-zone");
+      const zoneWidth = zone ? zone.getBoundingClientRect().width : window.innerWidth * .75;
+      const available = Math.max(300, Math.min(1120, zoneWidth * .96) - 20);
+      const preferredWidth = cardCount >= 19
+        ? clamp(available / 13.5, 40, 58)
+        : clamp(available / 10.5, 44, 68);
+      const step = cardCount > 1 ? (available - preferredWidth) / (cardCount - 1) : preferredWidth;
+      const overlap = clamp(step / preferredWidth - 1, -0.58, -0.18);
+
+      els.hand.style.setProperty("--card-w", `${preferredWidth.toFixed(1)}px`);
+      els.hand.style.setProperty("--hand-overlap", overlap.toFixed(3));
+    }
+
     function renderHand() {
       els.hand.innerHTML = "";
-      if (["dealing", "claimReveal"].includes(state.phase)) return;
-      const hand = state.hands[0];
+      if (["dealing", "claimReveal"].includes(state.phase)) {
+        configureHumanHandLayout(0);
+        return;
+      }
+      const hand = state.hands[0] || [];
+      configureHumanHandLayout(hand.length);
       const legal = state.phase === "playing" && state.turn === 0 ? new Set(legalCards(0).map(card => card.id)) : new Set();
       const interactive = !state.animatingPlay && ((state.phase === "playing" && state.turn === 0) || state.phase === "discard");
       hand.forEach((card, index) => {
@@ -5926,6 +5978,10 @@
         setTimeout(() => piece.remove(), 4300);
       }
     }
+
+    window.addEventListener("resize", () => {
+      configureHumanHandLayout((state.hands[0] || []).length);
+    });
 
     const resumedGame = restoreSavedGame();
     startStatsTicker();
