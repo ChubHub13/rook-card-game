@@ -822,6 +822,16 @@
       perspective: 900px;
     }
 
+    .kitty-reveal-cards.large-kitty {
+      max-width: min(690px, 82vw);
+      flex-wrap: wrap;
+      row-gap: 7px;
+    }
+
+    .kitty-reveal-cards.large-kitty .kitty-reveal-card {
+      --card-w: clamp(48px, 4.7vw, 66px);
+    }
+
     .kitty-reveal-card {
       --card-w: clamp(56px, 5.5vw, 76px);
       --card-h: calc(var(--card-w) * 1.42);
@@ -2464,6 +2474,14 @@
       text-align: center;
       font-size: 12px;
     }
+    .call-partner-actions {
+      display: flex;
+      justify-content: center;
+      margin: 0 0 9px;
+    }
+    .call-alone-button {
+      min-width: 210px;
+    }
     .call-card-grid {
       max-height: min(310px, 39vh);
       overflow: auto;
@@ -2543,6 +2561,291 @@
     @media (max-height: 760px) {
       .table-shell[data-player-count="5"] .player { padding: 5px 7px; min-width: 118px; }
       .table-shell[data-player-count="5"] .player-hand-points { font-size: 8px; }
+    }
+
+
+    /* Phone layout: present the table horizontally even when the device is held upright. */
+    @media (max-width: 760px) and (orientation: portrait) {
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      body {
+        position: fixed;
+        inset: 0;
+      }
+
+      .app {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 100vh;
+        width: 100dvh;
+        height: 100vw;
+        height: 100dvw;
+        min-height: 0;
+        max-width: none;
+        margin: 0;
+        padding: 5px;
+        gap: 5px;
+        overflow: hidden;
+        grid-template-rows: 48px minmax(0, 1fr);
+        transform: translate(-50%, -50%) rotate(90deg);
+        transform-origin: center;
+      }
+
+      .topbar {
+        position: relative;
+        top: 0;
+        min-height: 48px;
+        height: 48px;
+        flex-wrap: nowrap;
+        gap: 7px;
+        padding: 4px 7px;
+        border-radius: 11px;
+      }
+
+      .brand {
+        min-width: 150px;
+        gap: 7px;
+      }
+
+      .brand-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        font-size: 23px;
+      }
+
+      .brand h1 { font-size: 15px; }
+      .brand p { display: none; }
+
+      .topbar-last-trick {
+        order: initial;
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 190px;
+        min-height: 38px;
+        padding: 2px 6px;
+      }
+
+      .topbar-last-trick .score-history-heading { font-size: 8px; }
+      .topbar-last-trick .last-trick-summary { min-height: 27px; }
+      .topbar-last-trick .last-trick-result { display: none; }
+
+      .top-actions {
+        flex-wrap: nowrap;
+        gap: 4px;
+      }
+
+      .top-actions .btn {
+        min-height: 34px;
+        padding: 5px 8px;
+        font-size: 11px;
+      }
+
+      .game-layout {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        grid-template-columns: 132px minmax(0, 1fr);
+        gap: 5px;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .game-sidebar {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow: hidden;
+      }
+
+      .sidebar-panel { border-radius: 9px; }
+      .sidebar-heading { padding: 4px 5px 3px; font-size: 8px; }
+      .trump-display { min-height: 34px; padding: 3px 5px 4px; gap: 2px; font-size: 9px; }
+      .trump-display .trump-dot { width: 13px; height: 13px; border-width: 2px; }
+      .bid-winner-display { min-height: 40px; padding: 4px 6px; }
+      .bid-winner-display span { font-size: 8px; }
+      .bid-winner-display strong { font-size: 19px; }
+      .sidebar-scoreboard .team-score { padding: 3px 6px; gap: 4px; }
+      .sidebar-scoreboard .sidebar-score-name { font-size: 8px; }
+      .sidebar-scoreboard .score-value-wrap { min-width: 40px; }
+      .sidebar-scoreboard .score-value { font-size: 16px; }
+      .sidebar-scoreboard .hand-score { font-size: 6px; padding: 2px 3px; }
+      .sidebar-scoreboard .score-center { padding: 3px 4px; }
+      .sidebar-scoreboard .score-center strong { font-size: 8px; }
+      .sidebar-scoreboard .score-center span { font-size: 7px; }
+
+      .sidebar-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "new settings"
+          "down down";
+        gap: 4px;
+        margin-top: auto;
+      }
+
+      #newGameButton { grid-area: new; }
+      #settingsButton { grid-area: settings; }
+      #goDownButton { grid-area: down; }
+      .sidebar-actions .btn { min-height: 28px; padding: 3px 5px; font-size: 8px; }
+      .sidebar-actions .btn span { display: inline; }
+      .sidebar-actions .sidebar-go-down { min-height: 24px; font-size: 7px; }
+
+      .game-main {
+        min-height: 0;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) 42px;
+        gap: 4px;
+        overflow: hidden;
+      }
+
+      .table-shell {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        max-height: none;
+        border-width: 5px;
+        border-radius: 23px;
+      }
+
+      :root { --card-w: clamp(44px, 7.4vh, 62px); }
+      .player { min-width: 92px; padding: 3px 5px; border-radius: 8px; }
+      .player.north { top: 6px; }
+      .player.west { left: 5px; top: 42%; }
+      .player.east { right: 5px; top: 42%; }
+      .player.south { bottom: 85px; }
+      .avatar { width: 22px; height: 22px; font-size: 9px; }
+      .player-name { font-size: 9px; }
+      .player .player-detail { display: none; }
+      .player-hand-points { font-size: 7px; }
+      .mini-cards { display: none; }
+      .trick-area { top: 45%; width: 260px; height: 185px; }
+      .play-slot.west { left: 2px; }
+      .play-slot.east { right: 2px; }
+      .nest { top: 19%; right: 5px; font-size: 8px; }
+      .hand-zone { height: 86px; bottom: 1px; }
+      .hand { justify-content: center; overflow-x: auto; padding: 8px 5px 0; }
+      .card { margin-left: -13px; }
+      .card:first-child { margin-left: 0; }
+
+      .control-panel {
+        min-height: 42px;
+        height: 42px;
+        padding: 3px 5px;
+        border-radius: 10px;
+      }
+
+      .game-controls { gap: 4px; flex-wrap: nowrap; overflow-x: auto; justify-content: center; }
+      .game-controls .btn { min-width: 88px; min-height: 31px; padding: 4px 7px; font-size: 9px; }
+      .direct-bid-picker { gap: 4px; }
+      .bid-entry-label { font-size: 7px; }
+      .bid-value-input { min-width: 66px; min-height: 30px; font-size: 10px; }
+      .bid-action-group { gap: 4px; }
+      .bid-action-group .btn { min-width: 90px; }
+
+      .stats-ticker { display: none !important; }
+
+      .kitty-reveal {
+        top: 46%;
+        max-width: 82%;
+        padding: 7px 9px 8px;
+        gap: 5px;
+      }
+      .kitty-reveal-cards,
+      .kitty-reveal-cards.large-kitty {
+        max-width: min(620px, 76vw);
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .kitty-reveal-card,
+      .kitty-reveal-cards.large-kitty .kitty-reveal-card { --card-w: clamp(38px, 5.6vh, 49px); }
+      .kitty-reveal-title { font-size: 9px; }
+      .kitty-reveal-hint { font-size: 8px; }
+
+      .table-dialog {
+        top: 48%;
+        width: min(620px, calc(100% - 20px));
+        max-height: calc(100% - 18px);
+        padding: 9px;
+      }
+      .table-dialog.call-partner-dialog {
+        top: 5px;
+        width: min(650px, 94%);
+        max-height: calc(100% - 95px);
+      }
+      .call-card-grid {
+        max-height: 190px;
+        grid-template-columns: repeat(9, minmax(40px, 1fr));
+        gap: 4px;
+      }
+      .call-card-button .card { --card-w: 39px; }
+      .color-choice { min-height: 48px; font-size: 10px; }
+    }
+
+    @media (max-width: 760px) and (orientation: landscape) {
+      html,
+      body {
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .app {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+        grid-template-rows: 48px minmax(0, 1fr);
+      }
+
+      .topbar {
+        min-height: 48px;
+        height: 48px;
+        flex-wrap: nowrap;
+      }
+
+      .topbar-last-trick {
+        order: initial;
+        width: auto;
+        flex: 1 1 auto;
+      }
+
+      .game-layout {
+        height: 100%;
+        min-height: 0;
+        grid-template-columns: 132px minmax(0, 1fr);
+        gap: 5px;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .game-sidebar {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow: hidden;
+      }
+
+      .game-main {
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr) 42px;
+        gap: 4px;
+        overflow: hidden;
+      }
+
+      .table-shell { height: 100%; min-height: 0; border-width: 5px; border-radius: 23px; }
+      .control-panel { min-height: 42px; height: 42px; padding: 3px 5px; }
+      .stats-ticker { display: none !important; }
     }
 
   </style>
@@ -2714,7 +3017,7 @@
     const VALUES = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
     const POSITIONS = ["south", "west", "north", "east", "far-east"];
     const DEAL_CONFIG = {
-      3: { handSize: 13, nestSize: 6 },
+      3: { handSize: 12, nestSize: 9 },
       4: { handSize: 10, nestSize: 5 },
       5: { handSize: 8, nestSize: 5 }
     };
@@ -2860,7 +3163,20 @@
         }
       });
     });
-    els.bidWinnerDisplay.addEventListener("click", () => {
+
+
+    async function requestPhoneLandscape() {
+      if (!window.matchMedia("(max-width: 760px)").matches) return;
+      try {
+        if (screen.orientation && typeof screen.orientation.lock === "function") {
+          await screen.orientation.lock("landscape");
+        }
+      } catch (error) {
+        // CSS rotates the interface when browser orientation locking is unavailable.
+      }
+    }
+
+    document.addEventListener("pointerdown", requestPhoneLandscape, { once: true, passive: true });    els.bidWinnerDisplay.addEventListener("click", () => {
       const input = document.getElementById("bidValueInput");
       if (input) {
         input.focus();
@@ -3145,14 +3461,14 @@
 
     function isCurrentPartner(player) {
       if (player === 0) return false;
-      if (settings.callPartner) return state.calledPartner === player;
+      if (settings.callPartner) return state.calledPartner >= 0 && state.calledPartner === player;
       return playerCount() === 4 && player === 2;
     }
 
     function teamOf(player) {
       if (player === 0) return 0;
       if (settings.callPartner && state.calledPartner !== null) {
-        return player === state.calledPartner ? 0 : 1;
+        return state.calledPartner >= 0 && player === state.calledPartner ? 0 : 1;
       }
       return playerCount() === 4 && player === 2 ? 0 : 1;
     }
@@ -3195,9 +3511,10 @@
 
     function teamName(team) {
       if (settings.callPartner && state.calledPartner !== null) {
-        return team === 0
+        if (team !== 0) return "Defenders";
+        return state.calledPartner >= 0
           ? `${playerName(0)} & ${playerName(state.calledPartner)}`
-          : "Defenders";
+          : playerName(0);
       }
       if (playerCount() === 4 && !settings.callPartner) {
         return team === 0
@@ -3839,7 +4156,7 @@
     }
 
     function afterDiscardsReady() {
-      if (settings.callPartner) {
+      if (settings.callPartner && state.calledPartner === null) {
         state.phase = "callPartner";
         setPrompt("Call your partner", "Choose one card. Its holder becomes your partner for this hand.");
         renderAll();
@@ -3861,7 +4178,10 @@
 
       openTableDialog(`
         <div class="kitty-panel-title">Call Your Partner</div>
-        <p class="call-partner-intro">Choose one card. The player holding it joins you for this hand.</p>
+        <p class="call-partner-intro">Choose one card, or play the hand without a partner.</p>
+        <div class="call-partner-actions">
+          <button class="btn secondary call-alone-button" type="button" data-call-alone>Play Without a Partner</button>
+        </div>
         <div class="call-card-grid">
           ${eligible.map(({ card }) => `
             <button class="call-card-button" type="button" data-call-card="${card.id}" aria-label="Call ${escapeHtml(cardName(card))}">
@@ -3871,9 +4191,24 @@
         </div>
       `, "call-partner-dialog");
 
+      const playAloneButton = els.tableDialog.querySelector("[data-call-alone]");
+      if (playAloneButton) playAloneButton.addEventListener("click", selectNoPartner);
       els.tableDialog.querySelectorAll("[data-call-card]").forEach(button => {
         button.addEventListener("click", () => selectCalledCard(button.dataset.callCard));
       });
+    }
+
+    function selectNoPartner() {
+      if (state.phase !== "callPartner") return;
+      state.calledCard = null;
+      state.calledPartner = -1;
+      state.calledPartnerRevealed = false;
+      state.calledCardLeadBack = false;
+      state.calledPartnerTrumpReturn = false;
+      closeTableDialog();
+      logMessage(`${playerName(0)} chooses to play without a partner.`);
+      showToast("Playing without a partner");
+      beginPlay();
     }
 
     function selectCalledCard(cardId) {
@@ -3903,8 +4238,13 @@
     }
 
     function openTrumpPicker(isChange = false) {
-      if (!isChange && state.phase !== "chooseTrump") return;
-      if (isChange && state.phase !== "discard") return;
+      const phaseWhenOpened = state.phase;
+      const changingDuringPlay = isChange
+        && phaseWhenOpened === "playing"
+        && state.cardsPlayed === 0
+        && state.trick.length === 0;
+      if (!isChange && phaseWhenOpened !== "chooseTrump") return;
+      if (isChange && phaseWhenOpened !== "discard" && !changingDuringPlay) return;
       const choices = settings.allowNoTrump ? [...SUITS, "none"] : [...SUITS];
       openTableDialog(`
         <div class="kitty-panel-title">${isChange ? "Change Trump" : "Name Trump"}</div>
@@ -3916,18 +4256,47 @@
         button.addEventListener("click", () => {
           state.trump = button.dataset.trump;
           closeTableDialog();
+          state.hands.forEach(sortHand);
+          logMessage(`You choose ${trumpLabel()}.`);
+          playSound("trump");
+
+          if (changingDuringPlay) {
+            state.phase = "playing";
+            recordTrumpHandPeak();
+            setPrompt("", "");
+            renderAll();
+            return;
+          }
+
           state.phase = "discard";
           const selectedCount = state.selectedDiscards.size;
           setPrompt(
             `Return ${discardCount()} cards to the nest`,
             selectedCount ? `${selectedCount} of ${discardCount()} cards remain selected.` : `Select exactly ${discardCount()} cards to return.`
           );
-          state.hands.forEach(sortHand);
-          logMessage(`You choose ${trumpLabel()}.`);
-          playSound("trump");
           renderAll();
         });
       });
+    }
+
+    function changeKittyBeforePlay() {
+      if (state.phase !== "playing"
+        || state.highBidder !== 0
+        || state.cardsPlayed !== 0
+        || state.trick.length !== 0
+        || state.animatingPlay) return;
+
+      state.hands[0].push(...state.nest);
+      state.nest = [];
+      state.selectedDiscards.clear();
+      state.phase = "discard";
+      sortHand(state.hands[0]);
+      setPrompt(
+        `Choose ${discardCount()} cards for the kitty`,
+        `Select exactly ${discardCount()} cards to return.`
+      );
+      logMessage(`You pick up the kitty to change its ${discardCount()} cards.`);
+      renderAll();
     }
 
     function recordTrumpHandPeak() {
@@ -4521,6 +4890,11 @@
     function canClaimRest() {
       if (state.phase !== "playing" || state.turn !== 0 || state.trick.length !== 0 || state.hands[0].length === 0) return false;
       if (state.shootMoon && state.highBidder !== 0) return false;
+
+      const claimTeam = state.bidTeam ?? teamOf(0);
+      const teamPlayers = new Set(handTeamMembers(claimTeam));
+      if (!teamPlayers.has(0)) return false;
+
       const allCards = state.hands.flatMap((hand, player) => hand.map(card => ({ card, player })));
       const grouped = {};
       for (const entry of allCards) {
@@ -4528,21 +4902,24 @@
         (grouped[suit] ||= []).push(entry);
       }
 
-      for (const [suit, entries] of Object.entries(grouped)) {
-        const mine = entries.filter(entry => entry.player === 0);
-        if (!mine.length) continue;
+      // Treat the bidder and partner as one hand. In every color, their cards must
+      // occupy all of the highest remaining ranks that their combined holding needs.
+      for (const entries of Object.values(grouped)) {
+        const teamCardCount = entries.filter(entry => teamPlayers.has(entry.player)).length;
+        if (!teamCardCount) continue;
         entries.sort((a, b) => cardRank(b.card) - cardRank(a.card));
-        const topOwners = entries.slice(0, mine.length).map(entry => entry.player);
-        if (!topOwners.every(owner => owner === 0)) return false;
+        const topOwners = entries.slice(0, teamCardCount).map(entry => entry.player);
+        if (!topOwners.every(owner => teamPlayers.has(owner))) return false;
       }
 
-      const opposingTrumps = state.hands
-        .filter((hand, player) => player !== 0)
-        .flat()
-        .some(card => effectiveSuit(card) === state.trump);
-      const myTrumps = state.hands[0].filter(card => effectiveSuit(card) === state.trump);
-      const totalTrumps = allCards.filter(entry => effectiveSuit(entry.card) === state.trump);
-      if (opposingTrumps && myTrumps.length !== totalTrumps.length) return false;
+      // A defender with trump can still ruff an otherwise winning side color, so the
+      // claim is offered only when every remaining trump belongs to the bidder's team.
+      if (state.trump && state.trump !== "none") {
+        const defenderHasTrump = allCards.some(entry =>
+          !teamPlayers.has(entry.player) && effectiveSuit(entry.card) === state.trump
+        );
+        if (defenderHasTrump) return false;
+      }
 
       return true;
     }
@@ -4577,14 +4954,15 @@
 
     function finishClaimRest() {
       if (state.phase !== "claimReveal") return;
+      const claimTeam = state.bidTeam ?? teamOf(0);
       const remainingTricks = state.hands[0].length;
       const remaining = state.hands.flatMap(hand => hand.splice(0));
-      state.tricksWon[0] += remainingTricks;
-      state.tricksWonByPlayer[0] += remainingTricks;
-      state.captured[0].push(...remaining);
-      state.lastTrickWinner = 0;
+      state.tricksWon[claimTeam] += remainingTricks;
+      state.tricksWonByPlayer[state.highBidder ?? 0] += remainingTricks;
+      state.captured[claimTeam].push(...remaining);
+      state.lastTrickWinner = state.highBidder ?? 0;
       state.trick = [];
-      logMessage("You claim all remaining tricks.");
+      logMessage(`${teamName(claimTeam)} claims all remaining tricks.`);
       scoreHand();
     }
 
@@ -4737,8 +5115,10 @@
         <p><strong>${escapeHtml(scoreEntryName(gameWinner))} wins the game!</strong></p>
         <p class="final-score"><strong>Final score: ${finalScores}</strong></p>
       `;
-      const partnerSummary = settings.callPartner && state.calledCard && state.calledPartner !== null
-        ? `<p class="table-dialog-summary">Called ${escapeHtml(cardName(state.calledCard))} • Partner: ${escapeHtml(playerName(state.calledPartner))}</p>`
+      const partnerSummary = settings.callPartner && state.calledPartner !== null
+        ? state.calledPartner >= 0 && state.calledCard
+          ? `<p class="table-dialog-summary">Called ${escapeHtml(cardName(state.calledCard))} • Partner: ${escapeHtml(playerName(state.calledPartner))}</p>`
+          : `<p class="table-dialog-summary">Played without a partner</p>`
         : "";
       const bidSummary = wentDown
         ? `${teamName(state.bidTeam)} went down and loses ${state.highBid} points. The defenders receive no points.`
@@ -5314,7 +5694,7 @@
       }
 
       const cards = state.nest.map((card, index) => `
-        <div class="kitty-reveal-card" style="--delay:${index * 105}ms">
+        <div class="kitty-reveal-card" style="--delay:${index * 80}ms">
           <div class="kitty-reveal-inner">
             <div class="kitty-reveal-face kitty-reveal-back"></div>
             <div class="kitty-reveal-face kitty-reveal-front">${cardHtml(card)}</div>
@@ -5324,7 +5704,7 @@
 
       els.kittyReveal.innerHTML = `
         <div class="kitty-reveal-title">Kitty</div>
-        <div class="kitty-reveal-cards">${cards}</div>
+        <div class="kitty-reveal-cards ${state.nest.length > 6 ? "large-kitty" : ""}">${cards}</div>
         <div class="kitty-reveal-hint">Click to add to hand</div>
       `;
     }
@@ -5436,6 +5816,13 @@
       }
 
       if (state.phase === "playing") {
+        const beforeFirstCard = state.highBidder === 0
+          && state.cardsPlayed === 0
+          && state.trick.length === 0;
+        if (beforeFirstCard) {
+          addControlButton("Change Kitty", "", changeKittyBeforePlay);
+          addControlButton("Change Trump", "", () => openTrumpPicker(true));
+        }
         if (state.turn === 0 && canClaimRest()) {
           addControlButton("The Rest Are Mine", "success", claimRest);
         }
