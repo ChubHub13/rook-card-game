@@ -2180,6 +2180,48 @@
     .table-dialog .modal-actions { margin-top: 12px; }
     .table-dialog .final-score { margin: 5px 0 10px; }
 
+    .table-dialog.claim-score-dialog {
+      width: min(900px, calc(100% - 28px));
+      top: 50%;
+    }
+    .claim-score-section {
+      margin: 10px 0 12px;
+      padding: 9px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      background: rgba(0,0,0,.12);
+    }
+    .claim-score-heading {
+      margin-bottom: 7px;
+      color: var(--gold);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: .12em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .table-dialog.claim-score-dialog .claim-reveal-grid {
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 7px;
+      margin-top: 0;
+    }
+    .table-dialog.claim-score-dialog .claim-reveal-hand {
+      padding: 7px;
+      border-radius: 9px;
+    }
+    .table-dialog.claim-score-dialog .claim-reveal-hand strong {
+      margin-bottom: 5px;
+      font-size: 10px;
+    }
+    .table-dialog.claim-score-dialog .claim-reveal-cards {
+      gap: 3px;
+    }
+    .table-dialog.claim-score-dialog .claim-reveal-card {
+      --card-w: 36px;
+      --card-h: 51px;
+      border-radius: 5px;
+    }
+
     .table-dialog.swap-dialog {
       top: 50%;
       width: min(330px, calc(100% - 48px));
@@ -2940,6 +2982,28 @@
 
       .table-shell { height: 100%; min-height: 0; border-width: 5px; border-radius: 23px; }
       .control-panel { min-height: 42px; height: 42px; padding: 3px 5px; }
+      .table-dialog.claim-score-dialog {
+        width: calc(100% - 12px);
+        max-height: calc(100% - 10px);
+        padding: 7px 8px 8px;
+      }
+      .table-dialog.claim-score-dialog .claim-score-section { margin: 5px 0; padding: 5px; }
+      .table-dialog.claim-score-dialog .claim-reveal-grid {
+        grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+        gap: 4px;
+      }
+      .table-dialog.claim-score-dialog .claim-reveal-hand { padding: 4px; }
+      .table-dialog.claim-score-dialog .claim-reveal-hand strong { margin-bottom: 3px; font-size: 8px; }
+      .table-dialog.claim-score-dialog .claim-reveal-cards { gap: 2px; }
+      .table-dialog.claim-score-dialog .claim-reveal-card {
+        --card-w: 27px;
+        --card-h: 38px;
+      }
+      .table-dialog.claim-score-dialog .summary-grid { margin-top: 5px; gap: 5px; }
+      .table-dialog.claim-score-dialog .summary-card { padding: 5px; }
+      .table-dialog.claim-score-dialog .summary-card .big { font-size: 18px; }
+      .table-dialog.claim-score-dialog .modal-actions { margin-top: 5px; }
+
       .stats-ticker { display: none !important; }
     }
 
@@ -2953,7 +3017,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.0.2">v1.0.2</span>
+            <span class="version-badge" title="Version 1.0.4">v1.0.4</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -4525,6 +4589,19 @@
           winner,
           points: trickPoints
         };
+
+        // If the called partner wins the trick while still holding the called card,
+        // they must lead that called card on the next trick.
+        if (
+          settings.callPartner
+          && winner === state.calledPartner
+          && state.calledCard
+          && !state.calledPartnerRevealed
+          && state.hands[winner].some(remaining => remaining.id === state.calledCard.id)
+        ) {
+          state.calledCardLeadBack = true;
+        }
+
         state.tricksWon[teamOf(winner)] += 1;
         state.tricksWonByPlayer[winner] += 1;
         state.captured[teamOf(winner)].push(...cards);
@@ -4967,7 +5044,7 @@
 
       if (settings.callPartner && player === state.calledPartner && state.calledCardLeadBack && state.calledCard) {
         const called = legal.find(card => card.id === state.calledCard.id);
-        if (called && (!avoidTrumpLead || effectiveSuit(called) !== state.trump)) {
+        if (called) {
           state.calledCardLeadBack = false;
           return called;
         }
@@ -5053,10 +5130,9 @@
 
     function claimRest() {
       if (!canClaimRest()) return;
-      state.phase = "claimReveal";
       clearTimeout(botTimer);
-      setPrompt("Remaining cards", "Click the table to continue.");
-      renderAll();
+      botTimer = null;
+      resolveClaimRest(state.hands.map(hand => hand.map(card => ({ ...card }))));
     }
 
     function renderClaimReveal() {
@@ -5079,8 +5155,7 @@
       `;
     }
 
-    function finishClaimRest() {
-      if (state.phase !== "claimReveal") return;
+    function resolveClaimRest(revealedHands) {
       const remainingTricks = state.hands[0].length;
       const remaining = state.hands.flatMap(hand => hand.splice(0));
       state.tricksWon[0] += remainingTricks;
@@ -5089,7 +5164,14 @@
       state.lastTrickWinner = 0;
       state.trick = [];
       logMessage(`${playerName(0)} claims all remaining tricks.`);
-      scoreHand();
+      scoreHand(revealedHands);
+    }
+
+    function finishClaimRest() {
+      // Compatibility for a saved game that was paused on the older
+      // table-based claim reveal.
+      if (state.phase !== "claimReveal") return;
+      resolveClaimRest(state.hands.map(hand => hand.map(card => ({ ...card }))));
     }
 
     function goDown() {
@@ -5142,7 +5224,7 @@
       openScoreModal(handPoints, changes, false, gameWinner, true);
     }
 
-    function scoreHand() {
+    function scoreHand(claimHands = null) {
       state.phase = "scoring";
       const nestTeam = teamOf(state.lastTrickWinner ?? state.highBidder);
       state.captured[nestTeam].push(...state.nest);
@@ -5203,7 +5285,7 @@
       renderAll();
       saveGameState();
       playSound(gameWinner !== null ? "win" : madeBid ? "score" : "set");
-      openScoreModal(handPoints, changes, madeBid, gameWinner);
+      openScoreModal(handPoints, changes, madeBid, gameWinner, false, claimHands);
     }
 
     function determineGameWinner() {
@@ -5216,7 +5298,7 @@
       return leaders.length === 1 ? leaders[0].index : null;
     }
 
-    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false) {
+    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false, claimHands = null) {
       const totalAvailablePoints = points.reduce((sum, value) => sum + Number(value || 0), 0);
       const scoreCards = usesFixedTeamScoring()
         ? [0, 1].map(team => `
@@ -5251,18 +5333,36 @@
         : state.shootMoon
           ? `${teamName(state.bidTeam)} ${madeBid ? `captured all ${totalAvailablePoints} points and made` : "did not capture every point and failed"} the ${state.highBid} moon bid.`
           : `${teamName(state.bidTeam)} ${madeBid ? "made" : "did not make"} the ${state.highBid} bid.`;
+      const claimReveal = Array.isArray(claimHands) && claimHands.length
+        ? `
+          <section class="claim-score-section" aria-label="Remaining cards">
+            <div class="claim-score-heading">Remaining Cards</div>
+            <div class="claim-reveal-grid">
+              ${claimHands.map((hand, player) => `
+                <div class="claim-reveal-hand">
+                  <strong>${escapeHtml(playerName(player))}</strong>
+                  <div class="claim-reveal-cards">
+                    ${hand.map(card => cardHtml(card, "claim-reveal-card")).join("")}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </section>
+        `
+        : "";
       openTableDialog(`
         <div class="kitty-panel-title">${gameWinner === null ? `Hand ${state.handNumber} Complete` : "Game Over"}</div>
         <p class="table-dialog-summary">${escapeHtml(bidSummary)}</p>
         ${partnerSummary}
         ${winnerText}
+        ${claimReveal}
         <div class="summary-grid">${scoreCards}</div>
         <div class="modal-actions">
           ${gameWinner === null
             ? `<button class="btn primary" id="nextHandButton">Deal Next Hand</button>`
             : `<button class="btn" id="closeGameButton">Review Table</button><button class="btn primary" id="playAgainButton">Play Again</button>`}
         </div>
-      `, "score-dialog");
+      `, claimReveal ? "score-dialog claim-score-dialog" : "score-dialog");
 
       if (gameWinner === null) {
         els.tableDialog.querySelector("#nextHandButton").addEventListener("click", () => {
@@ -5882,21 +5982,45 @@
       els.hand.style.removeProperty("--card-w");
       els.hand.style.removeProperty("--hand-overlap");
 
-      // Large temporary hands use overlap only; selected kitty cards move to
-      // the center pile so the remaining cards keep their normal proportions.
-      if (cardCount <= 12) return;
+      // Only a three-player hand can temporarily grow to 21 cards. Keep the
+      // normal card size and spacing whenever the full hand already fits.
+      if (playerCount() !== 3 || cardCount <= dealConfig().handSize) return;
 
-      const zone = els.hand.closest(".hand-zone");
-      const zoneWidth = zone ? zone.getBoundingClientRect().width : window.innerWidth * .75;
-      const available = Math.max(300, Math.min(1120, zoneWidth * .96) - 20);
-      const preferredWidth = cardCount >= 19
-        ? clamp(available / 13.5, 40, 58)
-        : clamp(available / 10.5, 44, 68);
-      const step = cardCount > 1 ? (available - preferredWidth) / (cardCount - 1) : preferredWidth;
-      const overlap = clamp(step / preferredWidth - 1, -0.58, -0.18);
+      const probe = document.createElement("div");
+      probe.className = "card";
+      probe.setAttribute("aria-hidden", "true");
+      probe.style.position = "absolute";
+      probe.style.visibility = "hidden";
+      probe.style.pointerEvents = "none";
+      els.hand.appendChild(probe);
 
-      els.hand.style.setProperty("--card-w", `${preferredWidth.toFixed(1)}px`);
-      els.hand.style.setProperty("--hand-overlap", overlap.toFixed(3));
+      const probeStyle = getComputedStyle(probe);
+      const naturalCardWidth = probe.getBoundingClientRect().width || 72;
+      const naturalMargin = Number.parseFloat(probeStyle.marginLeft) || 0;
+      probe.remove();
+
+      const handStyle = getComputedStyle(els.hand);
+      const horizontalPadding = (Number.parseFloat(handStyle.paddingLeft) || 0)
+        + (Number.parseFloat(handStyle.paddingRight) || 0);
+      const available = Math.max(260, els.hand.getBoundingClientRect().width - horizontalPadding);
+      const naturalStep = naturalCardWidth + naturalMargin;
+      const naturalWidth = naturalCardWidth + Math.max(0, cardCount - 1) * naturalStep;
+      if (naturalWidth <= available + 1) return;
+
+      // Increase overlap just enough to fit. Only reduce card size on a very
+      // narrow landscape phone where overlap alone would hide too much detail.
+      let cardWidth = naturalCardWidth;
+      let step = (available - cardWidth) / Math.max(1, cardCount - 1);
+      let overlap = step / cardWidth - 1;
+
+      if (overlap < -0.62) {
+        cardWidth = clamp(available / 12.8, 40, naturalCardWidth);
+        step = (available - cardWidth) / Math.max(1, cardCount - 1);
+        overlap = step / cardWidth - 1;
+        els.hand.style.setProperty("--card-w", `${cardWidth.toFixed(1)}px`);
+      }
+
+      els.hand.style.setProperty("--hand-overlap", clamp(overlap, -0.68, -0.18).toFixed(3));
     }
 
     function renderHand() {
