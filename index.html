@@ -906,6 +906,70 @@
       to { transform: rotateY(180deg); }
     }
 
+    .discard-gather[hidden] { display: none; }
+
+    .discard-gather {
+      position: absolute;
+      z-index: 24;
+      left: 50%;
+      top: 49%;
+      min-width: 190px;
+      max-width: min(620px, 72%);
+      transform: translate(-50%, -50%);
+      display: grid;
+      justify-items: center;
+      gap: 7px;
+      padding: 9px 13px 11px;
+      border: 1px solid rgba(242,195,94,.42);
+      border-radius: 15px;
+      background: rgba(5,24,17,.82);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35), inset 0 0 22px rgba(0,0,0,.2);
+      pointer-events: auto;
+    }
+
+    .discard-gather-title {
+      color: var(--gold);
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .discard-gather-cards {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 70px;
+      padding-left: 16px;
+    }
+
+    .discard-gather-card {
+      --card-w: clamp(46px, 5vw, 64px);
+      --card-h: calc(var(--card-w) * 1.42);
+      flex: 0 0 var(--card-w) !important;
+      width: var(--card-w) !important;
+      height: var(--card-h) !important;
+      margin-left: calc(var(--card-w) * -.42) !important;
+      border-width: 1px;
+      transform: none !important;
+      cursor: pointer;
+    }
+
+    .discard-gather-card:first-child { margin-left: 0 !important; }
+    .discard-gather-card:hover,
+    .discard-gather-card:focus-visible {
+      z-index: 40 !important;
+      transform: translateY(-9px) !important;
+      outline: none;
+      box-shadow: 0 13px 22px rgba(0,0,0,.42), 0 0 0 3px rgba(242,195,94,.42);
+    }
+
+    body[data-theme="casual"] .discard-gather {
+      border-color: rgba(22,68,105,.28);
+      background: rgba(248,252,255,.94);
+      box-shadow: 0 12px 30px rgba(20,59,91,.22);
+    }
+
     .claim-table-reveal[hidden] { display: none; }
 
     .claim-table-reveal {
@@ -2123,6 +2187,27 @@
     .table-dialog .modal-actions { margin-top: 12px; }
     .table-dialog .final-score { margin: 5px 0 10px; }
 
+    .table-dialog.claim-score-dialog {
+      width: min(780px, calc(100% - 34px));
+    }
+
+    .table-dialog.claim-score-dialog .claim-reveal-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      max-height: 235px;
+      overflow: auto;
+      margin: 10px 0 12px;
+      padding-right: 3px;
+    }
+
+    .table-dialog.claim-score-dialog .claim-reveal-hand {
+      padding: 8px;
+    }
+
+    .table-dialog.claim-score-dialog .claim-reveal-card {
+      --card-w: 42px;
+      --card-h: 60px;
+    }
+
     .table-dialog.swap-dialog {
       top: 50%;
       width: min(330px, calc(100% - 48px));
@@ -2176,6 +2261,10 @@
       .stats-ticker-text { white-space: normal; }
       .settings-check-row { grid-template-columns: 1fr; }
       .table-dialog { top: 48%; width: calc(100% - 24px); }
+      .table-dialog.claim-score-dialog .claim-reveal-grid { grid-template-columns: 1fr 1fr; max-height: 170px; }
+      .table-dialog.claim-score-dialog .claim-reveal-card { --card-w: 36px; --card-h: 51px; }
+      .discard-gather { max-width: 64%; padding: 6px 9px 8px; }
+      .discard-gather-card { --card-w: 42px; }
     }
 
 
@@ -2896,7 +2985,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.0.0">v1.0.0</span>
+            <span class="version-badge" title="Version 1.0.1">v1.0.1</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3009,6 +3098,8 @@
 
       <div class="kitty-reveal" id="kittyReveal" hidden aria-label="Kitty cards. Click to add them to your hand."></div>
 
+      <div class="discard-gather" id="discardGather" hidden aria-label="Cards selected for the nest"></div>
+
       <div class="table-dialog" id="tableDialog" hidden role="dialog" aria-modal="true"></div>
 
       <div class="nest" id="nestDisplay">
@@ -3107,6 +3198,7 @@
     let botTimer = null;
     let toastTimer = null;
     let tableNoticeTimer = null;
+    const discardFlyingIds = new Set();
     let statsTickerTimer = null;
     let statsTickerIndex = 0;
 
@@ -3115,6 +3207,7 @@
       scores: initialScores(),
       scoreHistory: [],
       lastHand: null,
+      claimSummaryHands: null,
       lastTrick: null,
       handNumber: 0,
       dealer: 3,
@@ -3178,6 +3271,7 @@
       modal: document.getElementById("modal"),
       claimRevealTable: document.getElementById("claimRevealTable"),
       kittyReveal: document.getElementById("kittyReveal"),
+      discardGather: document.getElementById("discardGather"),
       tableDialog: document.getElementById("tableDialog"),
       statsTicker: document.getElementById("statsTicker"),
       statsTickerText: document.getElementById("statsTickerText"),
@@ -3455,15 +3549,15 @@
           advanceTurn();
         }
       } else if (state.phase === "claimReveal") {
-        setPrompt("Remaining cards", "Click the table to continue.");
-        renderAll();
+        finishClaimRest();
       } else if (["scoring", "gameover"].includes(state.phase) && state.lastHand) {
         openScoreModal(
           state.lastHand.points,
           state.lastHand.changes,
           state.lastHand.madeBid,
           state.phase === "gameover" ? state.winner : null,
-          Boolean(state.lastHand.wentDown)
+          Boolean(state.lastHand.wentDown),
+          state.lastHand.claimHands || null
         );
       }
     }
@@ -3662,6 +3756,8 @@
       state.finalHandPoints = null;
       state.trick = [];
       state.lastTrick = null;
+      state.claimSummaryHands = null;
+      discardFlyingIds.clear();
       state.trump = null;
       state.highBid = 0;
       state.highBidder = null;
@@ -4120,12 +4216,72 @@
       if (state.phase !== "discard") return;
       if (state.selectedDiscards.has(cardId)) {
         state.selectedDiscards.delete(cardId);
-      } else if (state.selectedDiscards.size < discardCount()) {
-        state.selectedDiscards.add(cardId);
-      } else {
-        showToast(`Select exactly ${discardCount()} cards`);
+        discardFlyingIds.delete(cardId);
+        renderAll();
+        return;
       }
+      if (state.selectedDiscards.size >= discardCount()) {
+        showToast(`Select exactly ${discardCount()} cards`);
+        return;
+      }
+
+      if (playerCount() === 3) {
+        animateDiscardCardToGather(cardId);
+      } else {
+        state.selectedDiscards.add(cardId);
+        renderAll();
+      }
+    }
+
+    function animateDiscardCardToGather(cardId) {
+      const card = state.hands[0].find(item => item.id === cardId);
+      const source = els.hand.querySelector(`[data-card-id="${cardId}"]`);
+      if (!card || !source || discardFlyingIds.has(cardId)) return;
+
+      const sourceRect = source.getBoundingClientRect();
+      const tableRect = document.querySelector(".table-shell").getBoundingClientRect();
+      const targetX = tableRect.left + tableRect.width / 2;
+      const targetY = tableRect.top + tableRect.height * .49;
+      const flying = source.cloneNode(true);
+      flying.classList.remove("selected", "playable", "illegal");
+      flying.classList.add("flying-card");
+      flying.disabled = true;
+      flying.style.left = `${sourceRect.left}px`;
+      flying.style.top = `${sourceRect.top}px`;
+      flying.style.width = `${sourceRect.width}px`;
+      flying.style.height = `${sourceRect.height}px`;
+      flying.style.transition = "none";
+      document.body.appendChild(flying);
+
+      state.selectedDiscards.add(cardId);
+      discardFlyingIds.add(cardId);
+      playSound("card");
       renderAll();
+
+      const dx = targetX - (sourceRect.left + sourceRect.width / 2);
+      const dy = targetY - (sourceRect.top + sourceRect.height / 2);
+      const endTransform = `translate3d(${dx}px, ${dy}px, 0) rotate(0deg) scale(.72)`;
+      const finish = () => {
+        flying.remove();
+        discardFlyingIds.delete(cardId);
+        renderAll();
+      };
+
+      if (typeof flying.animate !== "function") {
+        flying.style.transform = endTransform;
+        setTimeout(finish, 330);
+        return;
+      }
+
+      const animation = flying.animate([
+        { transform: "translate3d(0,0,0) rotate(0deg) scale(1)", opacity: 1 },
+        { transform: endTransform, opacity: 1 }
+      ], {
+        duration: 330,
+        easing: "cubic-bezier(.18,.72,.2,1)",
+        fill: "forwards"
+      });
+      animation.finished.then(finish).catch(finish);
     }
 
     function confirmDiscards() {
@@ -4135,10 +4291,14 @@
 
     function animateReturnedCardsToCenter() {
       const cards = state.hands[0].filter(card => state.selectedDiscards.has(card.id));
-      const sources = cards.map(card => els.hand.querySelector(`[data-card-id="${card.id}"]`));
+      const gathered = playerCount() === 3;
+      const sourceRoot = gathered ? els.discardGather : els.hand;
+      const sources = cards.map(card => sourceRoot.querySelector(`[data-card-id="${card.id}"]`));
       const tableRect = document.querySelector(".table-shell").getBoundingClientRect();
-      const targetX = tableRect.left + tableRect.width / 2;
-      const targetY = tableRect.top + tableRect.height * .48;
+      const nestRect = document.getElementById("nestDisplay").getBoundingClientRect();
+      const targetX = gathered ? nestRect.left + nestRect.width / 2 : tableRect.left + tableRect.width / 2;
+      const targetY = gathered ? nestRect.top + nestRect.height / 2 : tableRect.top + tableRect.height * .48;
+      const centerIndex = (cards.length - 1) / 2;
       state.animatingPlay = true;
       renderControls();
       els.rotateButton.disabled = true;
@@ -4150,7 +4310,7 @@
 
         const rect = source.getBoundingClientRect();
         const flying = source.cloneNode(true);
-        flying.classList.remove("selected", "playable", "illegal");
+        flying.classList.remove("selected", "playable", "illegal", "discard-gather-card");
         flying.classList.add("flying-card");
         flying.disabled = true;
         flying.style.left = `${rect.left}px`;
@@ -4162,13 +4322,13 @@
         document.body.appendChild(flying);
         flyingCards.push(flying);
 
-        const dx = targetX - (rect.left + rect.width / 2) + (index - 2) * 10;
-        const dy = targetY - (rect.top + rect.height / 2) + Math.abs(index - 2) * 4;
-        const endTransform = `translate3d(${dx}px, ${dy}px, 0) rotate(${(index - 2) * 5}deg) scale(.58)`;
+        const dx = targetX - (rect.left + rect.width / 2) + (index - centerIndex) * (gathered ? 2 : 10);
+        const dy = targetY - (rect.top + rect.height / 2) + Math.abs(index - centerIndex) * (gathered ? 1 : 4);
+        const endTransform = `translate3d(${dx}px, ${dy}px, 0) rotate(${(index - centerIndex) * (gathered ? 1.5 : 5)}deg) scale(${gathered ? .42 : .58})`;
 
         if (typeof flying.animate !== "function") {
           flying.style.transform = endTransform;
-          return new Promise(resolve => setTimeout(resolve, 650 + index * 70));
+          return new Promise(resolve => setTimeout(resolve, 520 + index * 35));
         }
 
         const animation = flying.animate([
@@ -4176,8 +4336,8 @@
           { offset: .82, transform: endTransform, opacity: 1 },
           { transform: endTransform, opacity: 0 }
         ], {
-          duration: 680,
-          delay: index * 70,
+          duration: gathered ? 520 : 680,
+          delay: index * (gathered ? 35 : 70),
           easing: "cubic-bezier(.18,.72,.2,1)",
           fill: "forwards"
         });
@@ -4191,6 +4351,7 @@
         state.hands[0] = state.hands[0].filter(card => !discardIds.has(card.id));
         sortHand(state.hands[0]);
         state.selectedDiscards.clear();
+        discardFlyingIds.clear();
         state.animatingPlay = false;
         afterDiscardsReady();
       });
@@ -4914,37 +5075,55 @@
       return [...leadPool].sort((a, b) => cardRank(a) - cardRank(b))[0];
     }
 
+    function claimLeadPriority(card) {
+      const suit = effectiveSuit(card);
+      const trumpBonus = state.trump && state.trump !== "none" && suit === state.trump ? 1000 : 0;
+      return trumpBonus + cardRank(card) * 10 + cardPoints(card);
+    }
+
+    function lowestPreservingCard(cards) {
+      return [...cards].sort((a, b) => {
+        const pointDiff = cardPoints(a) - cardPoints(b);
+        if (pointDiff !== 0) return pointDiff;
+        return cardRank(a) - cardRank(b);
+      })[0];
+    }
+
     function canClaimRest() {
       if (state.phase !== "playing" || state.turn !== 0 || state.trick.length !== 0 || state.hands[0].length === 0) return false;
       if (state.shootMoon && state.highBidder !== 0) return false;
 
-      const allCards = state.hands.flatMap((hand, player) => hand.map(card => ({ card, player })));
-      const grouped = {};
-      for (const entry of allCards) {
-        const suit = effectiveSuit(entry.card);
-        (grouped[suit] ||= []).push(entry);
-      }
+      // Simulate the user leading the strongest remaining cards. Defenders are
+      // assumed to preserve their highest cards whenever they cannot win now.
+      // The button only appears when every simulated lead is guaranteed to hold.
+      const hands = state.hands.map(hand => hand.map(card => ({ ...card })));
+      while (hands[0].length) {
+        hands[0].sort((a, b) => claimLeadPriority(b) - claimLeadPriority(a));
+        const lead = hands[0].shift();
+        const leadSuit = effectiveSuit(lead);
+        const userRank = cardRank(lead);
+        const userLedTrump = state.trump && state.trump !== "none" && leadSuit === state.trump;
 
-      // Use the original conservative claim rule: every card in the user's hand
-      // must be one of the highest remaining cards in its effective suit.
-      for (const entries of Object.values(grouped)) {
-        const mine = entries.filter(entry => entry.player === 0);
-        if (!mine.length) continue;
-        entries.sort((a, b) => cardRank(b.card) - cardRank(a.card));
-        const topOwners = entries.slice(0, mine.length).map(entry => entry.player);
-        if (!topOwners.every(owner => owner === 0)) return false;
-      }
+        for (let player = 1; player < hands.length; player++) {
+          const hand = hands[player];
+          const following = hand.filter(card => effectiveSuit(card) === leadSuit);
+          let chosen;
 
-      // A defender holding trump could still ruff a side-suit winner. Only offer
-      // the claim when every remaining trump is in the user's hand.
-      if (state.trump && state.trump !== "none") {
-        const opposingTrumps = state.hands
-          .filter((hand, player) => player !== 0)
-          .flat()
-          .some(card => effectiveSuit(card) === state.trump);
-        const myTrumps = state.hands[0].filter(card => effectiveSuit(card) === state.trump);
-        const totalTrumps = allCards.filter(entry => effectiveSuit(entry.card) === state.trump);
-        if (opposingTrumps && myTrumps.length !== totalTrumps.length) return false;
+          if (following.length) {
+            const higherFollower = following.some(card => cardRank(card) > userRank);
+            if (higherFollower) return false;
+            chosen = lowestPreservingCard(following);
+          } else {
+            const trumps = state.trump && state.trump !== "none"
+              ? hand.filter(card => effectiveSuit(card) === state.trump)
+              : [];
+            if (!userLedTrump && trumps.length) return false;
+            chosen = lowestPreservingCard(hand);
+          }
+
+          if (!chosen) return false;
+          hand.splice(hand.findIndex(card => card.id === chosen.id), 1);
+        }
       }
 
       return true;
@@ -4952,34 +5131,23 @@
 
     function claimRest() {
       if (!canClaimRest()) return;
-      state.phase = "claimReveal";
       clearTimeout(botTimer);
-      setPrompt("Remaining cards", "Click the table to continue.");
-      renderAll();
+      state.claimSummaryHands = state.hands.map(hand => hand.map(card => ({ ...card })));
+      state.phase = "claimReveal";
+      finishClaimRest();
     }
 
     function renderClaimReveal() {
-      const visible = state.phase === "claimReveal";
-      els.claimRevealTable.hidden = !visible;
-      if (!visible) {
-        els.claimRevealTable.innerHTML = "";
-        return;
-      }
-      els.claimRevealTable.innerHTML = `
-        ${state.hands.map((hand, player) => `
-          <div class="claim-table-hand ${POSITIONS[player]} claim-player-${player}">
-            <div class="claim-table-name">${escapeHtml(playerName(player))}</div>
-            <div class="claim-table-cards">
-              ${hand.map(card => cardHtml(card, "claim-table-card")).join("")}
-            </div>
-          </div>
-        `).join("")}
-        <div class="claim-table-continue">Click to continue</div>
-      `;
+      // The remaining cards are now included in the hand-complete dialog, so
+      // there is no separate reveal screen to click through.
+      els.claimRevealTable.hidden = true;
+      els.claimRevealTable.innerHTML = "";
     }
 
     function finishClaimRest() {
       if (state.phase !== "claimReveal") return;
+      const claimHands = state.claimSummaryHands
+        || state.hands.map(hand => hand.map(card => ({ ...card })));
       const remainingTricks = state.hands[0].length;
       const remaining = state.hands.flatMap(hand => hand.splice(0));
       state.tricksWon[0] += remainingTricks;
@@ -4988,7 +5156,7 @@
       state.lastTrickWinner = 0;
       state.trick = [];
       logMessage(`${playerName(0)} claims all remaining tricks.`);
-      scoreHand();
+      scoreHand(claimHands);
     }
 
     function goDown() {
@@ -5041,7 +5209,7 @@
       openScoreModal(handPoints, changes, false, gameWinner, true);
     }
 
-    function scoreHand() {
+    function scoreHand(claimHands = null) {
       state.phase = "scoring";
       const nestTeam = teamOf(state.lastTrickWinner ?? state.highBidder);
       state.captured[nestTeam].push(...state.nest);
@@ -5080,7 +5248,8 @@
         trump: state.trump,
         trumpHandRecord: state.trumpHandRecord ? { ...state.trumpHandRecord } : null,
         madeBid,
-        wentDown: false
+        wentDown: false,
+        claimHands: claimHands ? claimHands.map(hand => hand.map(card => ({ ...card }))) : null
       };
       state.lastHand = completedHand;
       state.scoreHistory.push(completedHand);
@@ -5102,7 +5271,7 @@
       renderAll();
       saveGameState();
       playSound(gameWinner !== null ? "win" : madeBid ? "score" : "set");
-      openScoreModal(handPoints, changes, madeBid, gameWinner);
+      openScoreModal(handPoints, changes, madeBid, gameWinner, false, claimHands);
     }
 
     function determineGameWinner() {
@@ -5115,7 +5284,7 @@
       return leaders.length === 1 ? leaders[0].index : null;
     }
 
-    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false) {
+    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false, claimHands = null) {
       const totalAvailablePoints = points.reduce((sum, value) => sum + Number(value || 0), 0);
       const scoreCards = usesFixedTeamScoring()
         ? [0, 1].map(team => `
@@ -5150,18 +5319,27 @@
         : state.shootMoon
           ? `${teamName(state.bidTeam)} ${madeBid ? `captured all ${totalAvailablePoints} points and made` : "did not capture every point and failed"} the ${state.highBid} moon bid.`
           : `${teamName(state.bidTeam)} ${madeBid ? "made" : "did not make"} the ${state.highBid} bid.`;
+      const claimSummary = Array.isArray(claimHands) && claimHands.some(hand => hand.length)
+        ? `<div class="claim-reveal-grid">${claimHands.map((hand, player) => `
+            <div class="claim-reveal-hand">
+              <strong>${escapeHtml(playerName(player))}</strong>
+              <div class="claim-reveal-cards">${hand.map(card => cardHtml(card, "claim-reveal-card")).join("")}</div>
+            </div>
+          `).join("")}</div>`
+        : "";
       openTableDialog(`
         <div class="kitty-panel-title">${gameWinner === null ? `Hand ${state.handNumber} Complete` : "Game Over"}</div>
         <p class="table-dialog-summary">${escapeHtml(bidSummary)}</p>
         ${partnerSummary}
         ${winnerText}
+        ${claimSummary}
         <div class="summary-grid">${scoreCards}</div>
         <div class="modal-actions">
           ${gameWinner === null
             ? `<button class="btn primary" id="nextHandButton">Deal Next Hand</button>`
             : `<button class="btn" id="closeGameButton">Review Table</button><button class="btn primary" id="playAgainButton">Play Again</button>`}
         </div>
-      `, "score-dialog");
+      `, claimSummary ? "score-dialog claim-score-dialog" : "score-dialog");
 
       if (gameWinner === null) {
         els.tableDialog.querySelector("#nextHandButton").addEventListener("click", () => {
@@ -5534,6 +5712,7 @@
       renderTrick();
       renderClaimReveal();
       renderKittyReveal();
+      renderDiscardGather();
       renderHand();
       renderControls();
       renderStatsTicker();
@@ -5541,6 +5720,7 @@
       els.goDownButton.hidden = !(state.phase === "playing" && state.bidTeam === 0 && state.trick.length < playerCount());
       document.querySelector(".table-shell").dataset.playerCount = String(playerCount());
       els.nestLabel.textContent = `${discardCount()}-card nest`;
+      document.getElementById("nestDisplay").classList.toggle("receiving-discards", state.phase === "discard" && playerCount() === 3 && state.selectedDiscards.size > 0);
       saveGameState();
     }
 
@@ -5737,22 +5917,45 @@
     function configureHumanHandLayout(cardCount) {
       els.hand.style.removeProperty("--card-w");
       els.hand.style.removeProperty("--hand-overlap");
-
-      // A three-player bidder temporarily holds 21 cards after taking the
-      // nine-card kitty. Size and overlap them to the actual table width.
       if (cardCount <= 12) return;
 
+      // Keep normal card proportions. With a large three-player hand, fit the
+      // cards by increasing overlap rather than shrinking or stretching them.
       const zone = els.hand.closest(".hand-zone");
       const zoneWidth = zone ? zone.getBoundingClientRect().width : window.innerWidth * .75;
       const available = Math.max(300, Math.min(1120, zoneWidth * .96) - 20);
-      const preferredWidth = cardCount >= 19
-        ? clamp(available / 13.5, 40, 58)
-        : clamp(available / 10.5, 44, 68);
-      const step = cardCount > 1 ? (available - preferredWidth) / (cardCount - 1) : preferredWidth;
-      const overlap = clamp(step / preferredWidth - 1, -0.58, -0.18);
-
-      els.hand.style.setProperty("--card-w", `${preferredWidth.toFixed(1)}px`);
+      const cardWidth = window.matchMedia("(max-width: 600px)").matches
+        ? 54
+        : clamp(window.innerWidth * .066, 56, 88);
+      const step = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : cardWidth;
+      const overlap = clamp(step / cardWidth - 1, -.72, -.18);
       els.hand.style.setProperty("--hand-overlap", overlap.toFixed(3));
+    }
+
+    function renderDiscardGather() {
+      const visible = state.phase === "discard" && playerCount() === 3 && state.selectedDiscards.size > 0;
+      els.discardGather.hidden = !visible;
+      if (!visible) {
+        els.discardGather.innerHTML = "";
+        return;
+      }
+
+      const selectedCards = state.hands[0].filter(card =>
+        state.selectedDiscards.has(card.id) && !discardFlyingIds.has(card.id)
+      );
+      els.discardGather.innerHTML = `
+        <div class="discard-gather-title">Nest ${state.selectedDiscards.size}/${discardCount()}</div>
+        <div class="discard-gather-cards">
+          ${selectedCards.map(card => `
+            <button type="button" class="card ${card.rook ? "rook" : card.suit} discard-gather-card" data-card-id="${card.id}" aria-label="Return ${escapeHtml(cardName(card))} to your hand">
+              ${cardInnerHtml(card)}
+            </button>
+          `).join("")}
+        </div>
+      `;
+      els.discardGather.querySelectorAll("[data-card-id]").forEach(button => {
+        button.addEventListener("click", () => toggleDiscard(button.dataset.cardId));
+      });
     }
 
     function renderHand() {
@@ -5762,16 +5965,19 @@
         return;
       }
       const hand = state.hands[0] || [];
-      configureHumanHandLayout(hand.length);
+      const displayedHand = state.phase === "discard" && playerCount() === 3
+        ? hand.filter(card => !state.selectedDiscards.has(card.id))
+        : hand;
+      configureHumanHandLayout(displayedHand.length);
       const legal = state.phase === "playing" && state.turn === 0 ? new Set(legalCards(0).map(card => card.id)) : new Set();
       const interactive = !state.animatingPlay && ((state.phase === "playing" && state.turn === 0) || state.phase === "discard");
-      hand.forEach((card, index) => {
+      displayedHand.forEach((card, index) => {
         const wrapper = document.createElement("button");
         wrapper.type = "button";
         wrapper.className = `card ${card.rook ? "rook" : card.suit}`;
         wrapper.dataset.cardId = card.id;
         wrapper.style.zIndex = String(index + 1);
-        const center = (hand.length - 1) / 2;
+        const center = (displayedHand.length - 1) / 2;
         const rotation = clamp((index - center) * 0.7, -5, 5);
         wrapper.style.transform = `rotate(${rotation}deg)`;
         wrapper.innerHTML = cardInnerHtml(card);
