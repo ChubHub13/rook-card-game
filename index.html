@@ -3007,6 +3007,145 @@
       .stats-ticker { display: none !important; }
     }
 
+
+    /* v1.0.5: every dialog fits without internal scrolling. */
+    .modal-backdrop {
+      padding: 8px;
+    }
+    .modal {
+      width: min(700px, calc(100% - 16px));
+      max-height: calc(100dvh - 16px);
+      overflow: hidden;
+      padding: 12px 14px;
+      border-radius: 16px;
+    }
+    .modal h2 { margin-bottom: 3px; font-size: 19px; }
+    .modal > p { margin-bottom: 7px; font-size: 11px; line-height: 1.25; }
+    .modal-actions { margin-top: 7px; }
+
+    .modal.settings-modal {
+      width: min(920px, calc(100% - 16px));
+    }
+    .settings-modal .settings-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px 8px;
+    }
+    .settings-modal .field { gap: 3px; }
+    .settings-modal .field.full { grid-column: 1 / -1; }
+    .settings-modal .field label { font-size: 9px; }
+    .settings-modal .field input,
+    .settings-modal .field select {
+      min-height: 30px;
+      padding: 5px 7px;
+      font-size: 11px;
+    }
+    .settings-modal .theme-choices { gap: 7px; }
+    .settings-modal .theme-choice {
+      grid-template-columns: 76px minmax(0, 1fr);
+      grid-template-rows: auto auto;
+      gap: 1px 7px;
+      padding: 5px 7px;
+      border-radius: 10px;
+    }
+    .settings-modal .theme-preview {
+      grid-row: 1 / 3;
+      height: 42px;
+      border-radius: 7px;
+    }
+    .settings-modal .theme-preview::before {
+      border-width: 3px;
+      border-radius: 10px;
+    }
+    .settings-modal .theme-choice strong { font-size: 10px; }
+    .settings-modal .theme-choice small { font-size: 8px; line-height: 1.15; }
+    .settings-modal .settings-check-row {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 5px;
+    }
+    .settings-modal .checkbox-setting {
+      min-height: 28px;
+      padding: 4px 6px;
+      font-size: 9px;
+    }
+    .settings-modal .rules-note {
+      margin-top: 6px;
+      padding: 5px 7px;
+      font-size: 8.5px;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .table-dialog {
+      top: 50%;
+      width: min(560px, calc(100% - 16px));
+      max-height: calc(100% - 12px);
+      overflow: hidden;
+      padding: 9px 10px 10px;
+    }
+    .kitty-panel-title { margin-bottom: 5px; font-size: 10px; }
+    .table-dialog-summary { margin-bottom: 5px; font-size: 10px; line-height: 1.2; }
+    .table-dialog .summary-grid { margin-top: 5px; gap: 5px; }
+    .table-dialog .summary-card { padding: 6px; border-radius: 9px; }
+    .table-dialog .summary-card strong { margin-bottom: 3px; font-size: 10px; }
+    .table-dialog .summary-card .big { font-size: 20px; }
+    .table-dialog .summary-card span { font-size: 9px; }
+    .table-dialog .modal-actions { margin-top: 6px; }
+
+    .table-dialog.call-partner-dialog {
+      top: 7px;
+      width: min(780px, calc(100% - 14px));
+      max-height: calc(100% - 14px);
+      overflow: hidden;
+    }
+    .call-partner-intro { margin-bottom: 5px; font-size: 9px; line-height: 1.15; }
+    .call-partner-actions { margin-bottom: 5px; }
+    .call-alone-button { min-width: 160px; min-height: 28px; padding: 4px 8px; font-size: 9px; }
+    .call-card-grid {
+      max-height: none;
+      overflow: hidden;
+      grid-template-columns: repeat(10, minmax(32px, 1fr));
+      gap: 3px;
+      padding: 2px;
+    }
+    .call-card-button { padding: 2px; border-radius: 6px; }
+    .call-card-button .card { --card-w: 34px; border-radius: 5px; }
+    .call-card-button .corner { font-size: 8px; }
+    .call-card-button .big-value { font-size: 18px; }
+    .call-card-button .suit-name { font-size: 4.5px; }
+
+    .table-dialog.claim-score-dialog {
+      width: min(940px, calc(100% - 12px));
+      max-height: calc(100% - 10px);
+      padding: 7px 8px 8px;
+    }
+    .claim-score-section { margin: 5px 0; padding: 5px; }
+    .claim-score-heading { margin-bottom: 4px; font-size: 8px; }
+    .table-dialog.claim-score-dialog .claim-reveal-grid {
+      grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+      gap: 4px;
+    }
+    .table-dialog.claim-score-dialog .claim-reveal-hand { padding: 4px; }
+    .table-dialog.claim-score-dialog .claim-reveal-hand strong { margin-bottom: 3px; font-size: 8px; }
+    .table-dialog.claim-score-dialog .claim-reveal-cards { gap: 2px; }
+    .table-dialog.claim-score-dialog .claim-reveal-card {
+      --card-w: 27px;
+      --card-h: 38px;
+    }
+
+    .kitty-reveal { cursor: default; }
+
+    @media (max-height: 650px) {
+      .modal.settings-modal { padding: 8px 10px; }
+      .settings-modal .settings-grid { gap: 4px 6px; }
+      .settings-modal .theme-preview { height: 34px; }
+      .settings-modal .field input,
+      .settings-modal .field select { min-height: 26px; padding: 3px 6px; }
+      .settings-modal .rules-note { display: none; }
+      .settings-modal .modal-actions { margin-top: 4px; }
+      .call-card-grid { grid-template-columns: repeat(12, minmax(28px, 1fr)); }
+      .call-card-button .card { --card-w: 30px; }
+    }
+
   </style>
 </head>
 <body>
@@ -3017,7 +3156,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.0.4">v1.0.4</span>
+            <span class="version-badge" title="Version 1.0.5">v1.0.5</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3128,7 +3267,7 @@
 
       <div class="claim-table-reveal" id="claimRevealTable" hidden aria-label="Remaining cards"></div>
 
-      <div class="kitty-reveal" id="kittyReveal" hidden aria-label="Kitty cards. Click to add them to your hand."></div>
+      <div class="kitty-reveal" id="kittyReveal" hidden aria-label="Kitty cards. They will be added to your hand automatically."></div>
 
       <div class="discard-selection-pile" id="discardSelectionPile" hidden aria-label="Cards selected for the kitty"></div>
 
@@ -3230,6 +3369,7 @@
     let botTimer = null;
     let toastTimer = null;
     let tableNoticeTimer = null;
+    let kittyRevealTimer = null;
     let statsTickerTimer = null;
     let statsTickerIndex = 0;
 
@@ -3317,7 +3457,6 @@
     els.settingsButton.addEventListener("click", openSettings);
     els.rotateButton.addEventListener("click", rotateHands);
     els.claimRevealTable.addEventListener("click", finishClaimRest);
-    els.kittyReveal.addEventListener("click", incorporateKitty);
     const reloadGamePage = () => window.location.reload();
     [els.reloadMark, els.reloadTitle].forEach(element => {
       element.addEventListener("click", reloadGamePage);
@@ -3571,8 +3710,9 @@
         renderAll();
         requestAnimationFrame(openCallPartnerPicker);
       } else if (state.phase === "kittyReveal" && state.highBidder === 0) {
-        setPrompt("Kitty", "Click the kitty to add it to your hand.");
+        setPrompt("Kitty", "The kitty will join your hand in 6 seconds.");
         renderAll();
+        scheduleKittyIncorporation();
       } else if (state.phase === "pickup" && state.highBidder !== 0) {
         scheduleBot(() => botPrepareBidder(state.highBidder), botDelay("prepare"));
       } else if (state.phase === "playing") {
@@ -3754,6 +3894,8 @@
     function startNewGame(keepScores) {
       gameToken += 1;
       clearTimeout(botTimer);
+      clearTimeout(kittyRevealTimer);
+      kittyRevealTimer = null;
       clearDealAnimation();
       if (!keepScores) clearSavedGame();
       delete els.modalBackdrop.dataset.locked;
@@ -3777,6 +3919,8 @@
       const redeal = Boolean(options.redeal);
       gameToken += 1;
       clearTimeout(botTimer);
+      clearTimeout(kittyRevealTimer);
+      kittyRevealTimer = null;
       clearDealAnimation();
       if (!redeal) {
         state.handNumber += 1;
@@ -4134,15 +4278,28 @@
 
       if (state.highBidder === 0) {
         state.phase = "kittyReveal";
-        setPrompt("Kitty", "Click the kitty to add it to your hand.");
+        setPrompt("Kitty", "The kitty will join your hand in 6 seconds.");
         renderAll();
+        scheduleKittyIncorporation();
       } else {
         scheduleBot(() => botPrepareBidder(state.highBidder), botDelay("prepare"));
       }
     }
 
+    function scheduleKittyIncorporation() {
+      clearTimeout(kittyRevealTimer);
+      const token = gameToken;
+      kittyRevealTimer = setTimeout(() => {
+        kittyRevealTimer = null;
+        if (token !== gameToken) return;
+        incorporateKitty();
+      }, 6000);
+    }
+
     function incorporateKitty() {
       if (state.phase !== "kittyReveal" || state.highBidder !== 0 || state.animatingPlay) return;
+      clearTimeout(kittyRevealTimer);
+      kittyRevealTimer = null;
       playSound("kitty");
 
       state.animatingPlay = true;
@@ -4541,8 +4698,11 @@
     function legalCards(player) {
       const hand = state.hands[player];
       if (!state.trick.length) return [...hand];
-      const ledCard = state.trick[0].card;
-      const leadSuit = effectiveSuit(ledCard);
+
+      // The Rook is not a free-play card. It belongs to trump (or red in
+      // No Trump), so it may only be played while holding the led color when
+      // that effective color was led. Otherwise the player must follow suit.
+      const leadSuit = effectiveSuit(state.trick[0].card);
       const following = hand.filter(card => effectiveSuit(card) === leadSuit);
       return following.length ? following : [...hand];
     }
@@ -4562,6 +4722,14 @@
 
     function playCard(player, cardId) {
       if (state.phase !== "playing" || state.turn !== player) return;
+      const legalIds = new Set(legalCards(player).map(card => card.id));
+      if (!legalIds.has(cardId)) {
+        state.animatingPlay = false;
+        if (player === 0) showToast("You must follow the led color when you can");
+        renderAll();
+        if (player !== 0) scheduleBot(() => botPlay(player), botDelay("play"));
+        return;
+      }
       const index = state.hands[player].findIndex(card => card.id === cardId);
       if (index < 0) return;
       const [card] = state.hands[player].splice(index, 1);
@@ -4834,7 +5002,16 @@
         if (nonTenDiscard.length) return lowestSafeDiscard(nonTenDiscard);
       }
 
-      if (winningCards.length) return lowestWinningCard(winningCards);
+      if (winningCards.length) {
+        const secureWinners = winningCards.filter(card => cardWinLooksSecure(player, card, leadSuit));
+        const secureWithoutCounters = secureWinners.filter(card => cardPoints(card) === 0);
+        if (secureWithoutCounters.length) return lowestWinningCard(secureWithoutCounters);
+        if (secureWinners.length) return lowestWinningCard(secureWinners);
+        if (state.trick.length === playerCount() - 1) return lowestWinningCard(winningCards);
+
+        const pressureWinners = winningCards.filter(card => cardPoints(card) === 0 && !isGuardedFourteen(card));
+        if (pressureWinners.length) return lowestWinningCard(pressureWinners);
+      }
 
       return lowestSafeDiscard(partnerPool);
     }
@@ -5039,6 +5216,17 @@
         && !defendersStillHoldTrump();
     }
 
+    function opponentCanBeatLead(player, card) {
+      const leadSuit = effectiveSuit(card);
+      return playerIndexes().some(opponent => {
+        if (opponent === player || teamOf(opponent) === teamOf(player)) return false;
+        const hand = state.hands[opponent];
+        const followers = hand.filter(candidate => effectiveSuit(candidate) === leadSuit);
+        const legal = followers.length ? followers : hand;
+        return legal.some(candidate => beats(candidate, card, leadSuit));
+      });
+    }
+
     function chooseLeadCard(player, legal) {
       const avoidTrumpLead = calledPartnerShouldAvoidTrumpLead(player);
 
@@ -5063,66 +5251,102 @@
         ? legal.filter(card => effectiveSuit(card) !== state.trump)
         : legal;
       const leadPool = nonTrumpLeads.length ? nonTrumpLeads : legal;
-      const hand = state.hands[player];
-      const suitGroups = {};
-      for (const card of hand) {
-        const suit = effectiveSuit(card);
-        (suitGroups[suit] ||= []).push(card);
-      }
 
-      const sureWinners = leadPool.filter(card => {
-        const allOthers = state.hands.flatMap((h, i) => i === player ? [] : h);
-        return !allOthers.some(other => {
-          if (effectiveSuit(other) !== effectiveSuit(card)) return false;
-          return cardRank(other) > cardRank(card);
-        });
-      });
+      // Cash a card only when no opponent can legally beat it, including a
+      // possible trump from a player who is void in the led color.
+      const sureWinners = leadPool.filter(card => !opponentCanBeatLead(player, card));
       if (sureWinners.length) {
-        return [...sureWinners].sort((a, b) => cardPoints(b) - cardPoints(a) || cardRank(b) - cardRank(a))[0];
+        return [...sureWinners].sort((a, b) =>
+          cardPoints(b) - cardPoints(a)
+          || claimLeadStrength(b) - claimLeadStrength(a)
+        )[0];
       }
 
-      const nonPoints = leadPool.filter(card => cardPoints(card) === 0 && effectiveSuit(card) !== state.trump);
-      if (nonPoints.length) {
-        return [...nonPoints].sort((a, b) => {
-          const lengthDiff = suitGroups[effectiveSuit(b)].length - suitGroups[effectiveSuit(a)].length;
-          return lengthDiff || cardRank(a) - cardRank(b);
-        })[0];
+      // When the bidding side has multiple trumps, use a high trump to pull
+      // opposing trump rather than exposing a side-suit counter.
+      if (!avoidTrumpLead && state.trump && state.trump !== "none" && teamOf(player) === state.bidTeam) {
+        const trumps = leadPool.filter(card => effectiveSuit(card) === state.trump);
+        const opposingTrump = playerIndexes().some(opponent =>
+          teamOf(opponent) !== teamOf(player)
+          && state.hands[opponent].some(card => effectiveSuit(card) === state.trump)
+        );
+        if (trumps.length >= 2 && opposingTrump) {
+          return [...trumps].sort((a, b) => cardRank(b) - cardRank(a))[0];
+        }
       }
 
-      return [...leadPool].sort((a, b) => cardRank(a) - cardRank(b))[0];
+      // Otherwise lead a low non-counter from the shortest available color to
+      // work toward a void while preserving 1s, 14s, 10s, and the Rook.
+      const nonCounters = leadPool.filter(card =>
+        cardPoints(card) === 0
+        && !isGuardedFourteen(card)
+        && effectiveSuit(card) !== state.trump
+      );
+      const candidates = nonCounters.length ? nonCounters : leadPool;
+      const suitLengths = candidates.reduce((counts, card) => {
+        const suit = effectiveSuit(card);
+        counts[suit] = (counts[suit] || 0) + 1;
+        return counts;
+      }, {});
+
+      return [...candidates].sort((a, b) =>
+        (suitLengths[effectiveSuit(a)] || 0) - (suitLengths[effectiveSuit(b)] || 0)
+        || cardPoints(a) - cardPoints(b)
+        || cardRank(a) - cardRank(b)
+      )[0];
+    }
+
+    function claimLeadStrength(card) {
+      const suit = effectiveSuit(card);
+      const isTrump = state.trump && state.trump !== "none" && suit === state.trump;
+      return (isTrump ? 100 : 0) + cardRank(card);
+    }
+
+    function chooseHighestClaimLead(hand) {
+      return [...hand].sort((a, b) =>
+        claimLeadStrength(b) - claimLeadStrength(a)
+        || cardPoints(b) - cardPoints(a)
+        || cardRank(b) - cardRank(a)
+      )[0];
+    }
+
+    function lowestClaimDiscard(cards) {
+      return [...cards].sort((a, b) =>
+        cardPoints(a) - cardPoints(b)
+        || cardRank(a) - cardRank(b)
+      )[0];
     }
 
     function canClaimRest() {
       if (state.phase !== "playing" || state.turn !== 0 || state.trick.length !== 0 || state.hands[0].length === 0) return false;
       if (state.shootMoon && state.highBidder !== 0) return false;
 
-      const allCards = state.hands.flatMap((hand, player) => hand.map(card => ({ card, player })));
-      const grouped = {};
-      for (const entry of allCards) {
-        const suit = effectiveSuit(entry.card);
-        (grouped[suit] ||= []).push(entry);
-      }
+      // Simulate the rest of the hand with the user leading their strongest
+      // remaining card each time. Opponents preserve their higher cards when
+      // they cannot win. The claim is offered only if no opponent can legally
+      // beat any of those leads. This prevents cases such as 1/11 being called
+      // good while another hand still holds 14/7 in that color.
+      const simulatedHands = state.hands.map(hand => hand.map(card => ({ ...card })));
 
-      // Use the original conservative claim rule: every card in the user's hand
-      // must be one of the highest remaining cards in its effective suit.
-      for (const entries of Object.values(grouped)) {
-        const mine = entries.filter(entry => entry.player === 0);
-        if (!mine.length) continue;
-        entries.sort((a, b) => cardRank(b.card) - cardRank(a.card));
-        const topOwners = entries.slice(0, mine.length).map(entry => entry.player);
-        if (!topOwners.every(owner => owner === 0)) return false;
-      }
+      while (simulatedHands[0].length) {
+        const leadCard = chooseHighestClaimLead(simulatedHands[0]);
+        const leadIndex = simulatedHands[0].findIndex(card => card.id === leadCard.id);
+        simulatedHands[0].splice(leadIndex, 1);
+        const leadSuit = effectiveSuit(leadCard);
 
-      // A defender holding trump could still ruff a side-suit winner. Only offer
-      // the claim when every remaining trump is in the user's hand.
-      if (state.trump && state.trump !== "none") {
-        const opposingTrumps = state.hands
-          .filter((hand, player) => player !== 0)
-          .flat()
-          .some(card => effectiveSuit(card) === state.trump);
-        const myTrumps = state.hands[0].filter(card => effectiveSuit(card) === state.trump);
-        const totalTrumps = allCards.filter(entry => effectiveSuit(entry.card) === state.trump);
-        if (opposingTrumps && myTrumps.length !== totalTrumps.length) return false;
+        for (let player = 1; player < playerCount(); player++) {
+          const hand = simulatedHands[player];
+          if (!hand.length) continue;
+          const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
+          const legal = followers.length ? followers : hand;
+
+          if (legal.some(card => beats(card, leadCard, leadSuit))) return false;
+
+          // Preserve the opponent's strongest threats for later tricks.
+          const discard = lowestClaimDiscard(legal);
+          const discardIndex = hand.findIndex(card => card.id === discard.id);
+          hand.splice(discardIndex, 1);
+        }
       }
 
       return true;
@@ -5427,9 +5651,10 @@
     function openSettings() {
       const activeGame = !["idle", "gameover"].includes(state.phase);
       els.modalBackdrop.dataset.locked = "false";
+      els.modal.className = "modal settings-modal";
       els.modal.innerHTML = `
         <h2>Game settings</h2>
-        <p>Names update immediately. Changing the number of players or Call Partner mode starts a new game.</p>
+        <p>Player-count and Call Partner changes begin a new game.</p>
         <div class="settings-grid">
           <div class="field full">
             <label>Table theme</label>
@@ -5534,9 +5759,7 @@
             <input id="fourthNameSetting" maxlength="18" value="${escapeHtml(settings.botNames[3])}">
           </div>
         </div>
-        <div class="rules-note">
-          Card points: each 1 is 15, each 5 is 5, each 10 and 14 is 10, and the Rook is 20. The last trick adds 20, making 200 points per hand. Four-player games use fixed partners unless Call Partner is enabled. Call Partner is unavailable in three-player games. Three-player, five-player, and Call Partner games keep individual totals; temporary teammates receive the same hand result. A 400 bid is a moon bid and succeeds when the bidder's temporary team captures all 200 points in the hand.
-        </div>
+        <div class="rules-note">1s: 15 • 5s: 5 • 10s/14s: 10 • Rook: 20 • Last trick: 20 • A 400 bid requires all 200 points.</div>
         <div class="modal-actions">
           <button class="btn" id="cancelSettings">Cancel</button>
           <button class="btn primary" id="saveSettings">Save Settings</button>
@@ -5628,6 +5851,7 @@
 
     function openConfirmModal(title, message, confirmLabel, callback) {
       els.modalBackdrop.dataset.locked = "false";
+      els.modal.className = "modal confirm-modal";
       els.modal.innerHTML = `
         <h2>${escapeHtml(title)}</h2>
         <p>${escapeHtml(message)}</p>
@@ -5645,7 +5869,7 @@
     function closeModal() {
       if (els.modalBackdrop.dataset.locked === "true") return;
       els.modalBackdrop.classList.remove("open", "trump-choice");
-      els.modal.classList.remove("claim-reveal-modal");
+      els.modal.className = "modal";
       els.modal.innerHTML = "";
       delete els.modalBackdrop.dataset.locked;
       renderStatsTicker();
@@ -5946,7 +6170,7 @@
       els.kittyReveal.innerHTML = `
         <div class="kitty-reveal-title">Kitty</div>
         <div class="kitty-reveal-cards ${state.nest.length > 6 ? "large-kitty" : ""}">${cards}</div>
-        <div class="kitty-reveal-hint">Click to add to hand</div>
+        <div class="kitty-reveal-hint">Adding to hand in 6 seconds</div>
       `;
     }
 
