@@ -3132,7 +3132,7 @@
       --card-h: 38px;
     }
 
-    .kitty-reveal { cursor: default; }
+    .kitty-reveal { cursor: pointer; }
 
     @media (max-height: 650px) {
       .modal.settings-modal { padding: 8px 10px; }
@@ -3156,7 +3156,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.0.5">v1.0.5</span>
+            <span class="version-badge" title="Version 1.0.8">v1.0.8</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3267,7 +3267,7 @@
 
       <div class="claim-table-reveal" id="claimRevealTable" hidden aria-label="Remaining cards"></div>
 
-      <div class="kitty-reveal" id="kittyReveal" hidden aria-label="Kitty cards. They will be added to your hand automatically."></div>
+      <div class="kitty-reveal" id="kittyReveal" hidden role="button" tabindex="0" aria-label="Kitty cards. Click or double-click to add them to your hand now, or wait six seconds."></div>
 
       <div class="discard-selection-pile" id="discardSelectionPile" hidden aria-label="Cards selected for the kitty"></div>
 
@@ -3457,6 +3457,17 @@
     els.settingsButton.addEventListener("click", openSettings);
     els.rotateButton.addEventListener("click", rotateHands);
     els.claimRevealTable.addEventListener("click", finishClaimRest);
+    els.kittyReveal.addEventListener("click", incorporateKitty);
+    els.kittyReveal.addEventListener("dblclick", event => {
+      event.preventDefault();
+      incorporateKitty();
+    });
+    els.kittyReveal.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        incorporateKitty();
+      }
+    });
     const reloadGamePage = () => window.location.reload();
     [els.reloadMark, els.reloadTitle].forEach(element => {
       element.addEventListener("click", reloadGamePage);
@@ -3659,7 +3670,7 @@
         }
         state.shootMoon = Number(state.highBid) === 400;
         state.scores = Array.isArray(restored.scores) && restored.scores.length === scoreEntryCount()
-          ? restored.scores.map(value => Number(value) || 0)
+          ? restored.scores.map(value => Math.max(0, Number(value) || 0))
           : initialScores();
         state.tricksWon = Array.isArray(restored.tricksWon) && restored.tricksWon.length === 2
           ? restored.tricksWon.map(value => Math.max(0, Number(value) || 0))
@@ -3710,7 +3721,7 @@
         renderAll();
         requestAnimationFrame(openCallPartnerPicker);
       } else if (state.phase === "kittyReveal" && state.highBidder === 0) {
-        setPrompt("Kitty", "The kitty will join your hand in 6 seconds.");
+        setPrompt("Kitty", "Click the kitty to add it now, or wait 6 seconds.");
         renderAll();
         scheduleKittyIncorporation();
       } else if (state.phase === "pickup" && state.highBidder !== 0) {
@@ -3799,9 +3810,17 @@
       if (!Array.isArray(state.scores) || state.scores.length !== expected) {
         state.scores = initialScores();
       }
+
+      const appliedChanges = Array.from({ length: expected }, () => 0);
       changes.forEach((change, index) => {
-        state.scores[index] = Number(state.scores[index] || 0) + Number(change || 0);
+        if (index >= expected) return;
+        const currentScore = Math.max(0, Number(state.scores[index]) || 0);
+        const requestedChange = Number(change) || 0;
+        const nextScore = Math.max(0, currentScore + requestedChange);
+        state.scores[index] = nextScore;
+        appliedChanges[index] = nextScore - currentScore;
       });
+      return appliedChanges;
     }
 
     function totalTricksInHand() {
@@ -4278,7 +4297,7 @@
 
       if (state.highBidder === 0) {
         state.phase = "kittyReveal";
-        setPrompt("Kitty", "The kitty will join your hand in 6 seconds.");
+        setPrompt("Kitty", "Click the kitty to add it now, or wait 6 seconds.");
         renderAll();
         scheduleKittyIncorporation();
       } else {
@@ -5411,8 +5430,8 @@
       const handPoints = [0, 0];
       const teamChanges = [0, 0];
       teamChanges[state.bidTeam] = -state.highBid;
-      const changes = scoreChangesForPlayers(teamChanges);
-      applyScoreChanges(changes);
+      let changes = scoreChangesForPlayers(teamChanges);
+      changes = applyScoreChanges(changes);
 
       const completedHand = {
         hand: state.handNumber,
@@ -5468,8 +5487,8 @@
         teamChanges[state.bidTeam] = -state.highBid;
       }
 
-      const changes = scoreChangesForPlayers(teamChanges);
-      applyScoreChanges(changes);
+      let changes = scoreChangesForPlayers(teamChanges);
+      changes = applyScoreChanges(changes);
       const completedHand = {
         hand: state.handNumber,
         points: [...handPoints],
@@ -6170,7 +6189,7 @@
       els.kittyReveal.innerHTML = `
         <div class="kitty-reveal-title">Kitty</div>
         <div class="kitty-reveal-cards ${state.nest.length > 6 ? "large-kitty" : ""}">${cards}</div>
-        <div class="kitty-reveal-hint">Adding to hand in 6 seconds</div>
+        <div class="kitty-reveal-hint">Click or double-click to add now • automatic in 6 seconds</div>
       `;
     }
 
