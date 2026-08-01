@@ -3146,6 +3146,28 @@
       .call-card-button .card { --card-w: 30px; }
     }
 
+
+    /* v1.0.9: larger called-card choices and responsive settings visibility. */
+    .call-card-grid {
+      grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+      gap: 4px;
+      max-height: none;
+      overflow: hidden;
+    }
+    .call-card-button { padding: 2px; }
+    .call-card-button .card { --card-w: 46px; }
+    .call-card-button .corner { font-size: 10px; }
+    .call-card-button .big-value { font-size: 23px; }
+    .call-card-button .suit-name { font-size: 5.5px; }
+    #callPartnerWrap[hidden],
+    #threePlayerKittyWrap[hidden] { display: none !important; }
+
+    @media (max-height: 520px), (max-width: 760px) {
+      .call-card-grid { grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 3px; }
+      .call-card-button .card { --card-w: 40px; }
+      .call-card-button .corner { font-size: 9px; }
+      .call-card-button .big-value { font-size: 20px; }
+    }
   </style>
 </head>
 <body>
@@ -3156,7 +3178,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.0.8">v1.0.8</span>
+            <span class="version-badge" title="Version 1.0.9">v1.0.9</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3267,7 +3289,7 @@
 
       <div class="claim-table-reveal" id="claimRevealTable" hidden aria-label="Remaining cards"></div>
 
-      <div class="kitty-reveal" id="kittyReveal" hidden role="button" tabindex="0" aria-label="Kitty cards. Click or double-click to add them to your hand now, or wait six seconds."></div>
+      <div class="kitty-reveal" id="kittyReveal" hidden role="button" tabindex="0" aria-label="Kitty cards. Click to add them to your hand."></div>
 
       <div class="discard-selection-pile" id="discardSelectionPile" hidden aria-label="Cards selected for the kitty"></div>
 
@@ -3325,7 +3347,7 @@
       5: { handSize: 8, nestSize: 5 }
     };
 
-    const SETTINGS_VERSION = 16;
+    const SETTINGS_VERSION = 17;
     const GAME_SAVE_VERSION = 2;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
     const DEFAULT_SETTINGS = {
@@ -3341,6 +3363,7 @@
       showStats: true,
       callPartner: false,
       playerCount: 4,
+      threePlayerKittySize: 9,
       userName: "You",
       botNames: ["Mara", "Cal", "June", "Wes"]
     };
@@ -3532,6 +3555,7 @@
           showStats: saved.showStats !== false,
           callPartner: savedPlayerCount === 3 ? false : saved.callPartner === true,
           playerCount: savedPlayerCount,
+          threePlayerKittySize: [6, 9].includes(Number(saved.threePlayerKittySize)) ? Number(saved.threePlayerKittySize) : DEFAULT_SETTINGS.threePlayerKittySize,
           userName: cleanName(saved.userName || DEFAULT_SETTINGS.userName, DEFAULT_SETTINGS.userName),
           botNames: Array.isArray(saved.botNames)
             ? [0, 1, 2, 3].map(i => cleanName(saved.botNames[i] || DEFAULT_SETTINGS.botNames[i]))
@@ -3721,9 +3745,8 @@
         renderAll();
         requestAnimationFrame(openCallPartnerPicker);
       } else if (state.phase === "kittyReveal" && state.highBidder === 0) {
-        setPrompt("Kitty", "Click the kitty to add it now, or wait 6 seconds.");
+        setPrompt("Kitty", "Click the kitty to add it to your hand.");
         renderAll();
-        scheduleKittyIncorporation();
       } else if (state.phase === "pickup" && state.highBidder !== 0) {
         scheduleBot(() => botPrepareBidder(state.highBidder), botDelay("prepare"));
       } else if (state.phase === "playing") {
@@ -3763,6 +3786,12 @@
     }
 
     function dealConfig() {
+      if (playerCount() === 3) {
+        const nestSize = [6, 9].includes(Number(settings.threePlayerKittySize))
+          ? Number(settings.threePlayerKittySize)
+          : DEFAULT_SETTINGS.threePlayerKittySize;
+        return { handSize: (45 - nestSize) / 3, nestSize };
+      }
       return DEAL_CONFIG[playerCount()] || DEAL_CONFIG[4];
     }
 
@@ -4297,22 +4326,11 @@
 
       if (state.highBidder === 0) {
         state.phase = "kittyReveal";
-        setPrompt("Kitty", "Click the kitty to add it now, or wait 6 seconds.");
+        setPrompt("Kitty", "Click the kitty to add it to your hand.");
         renderAll();
-        scheduleKittyIncorporation();
       } else {
         scheduleBot(() => botPrepareBidder(state.highBidder), botDelay("prepare"));
       }
-    }
-
-    function scheduleKittyIncorporation() {
-      clearTimeout(kittyRevealTimer);
-      const token = gameToken;
-      kittyRevealTimer = setTimeout(() => {
-        kittyRevealTimer = null;
-        if (token !== gameToken) return;
-        incorporateKitty();
-      }, 6000);
     }
 
     function incorporateKitty() {
@@ -5337,34 +5355,39 @@
     }
 
     function canClaimRest() {
-      if (state.phase !== "playing" || state.turn !== 0 || state.trick.length !== 0 || state.hands[0].length === 0) return false;
-      if (state.shootMoon && state.highBidder !== 0) return false;
+      if (state.phase !== "playing"
+          || state.highBidder !== 0
+          || state.turn !== 0
+          || state.trick.length !== 0
+          || state.hands[0].length === 0) return false;
 
-      // Simulate the rest of the hand with the user leading their strongest
-      // remaining card each time. Opponents preserve their higher cards when
-      // they cannot win. The claim is offered only if no opponent can legally
-      // beat any of those leads. This prevents cases such as 1/11 being called
-      // good while another hand still holds 14/7 in that color.
-      const simulatedHands = state.hands.map(hand => hand.map(card => ({ ...card })));
+      // This deliberately uses only the bidder's cards. The button appears
+      // only when every remaining bidder card is provably unbeatable.
+      // It does not rely on the partner taking a trick or returning a lead.
+      const bidderHand = state.hands[0];
+      const defenders = state.hands.slice(1);
+      const trumpSuit = state.trump && state.trump !== "none" ? state.trump : null;
+      const bidderSuits = [...new Set(bidderHand.map(effectiveSuit))];
 
-      while (simulatedHands[0].length) {
-        const leadCard = chooseHighestClaimLead(simulatedHands[0]);
-        const leadIndex = simulatedHands[0].findIndex(card => card.id === leadCard.id);
-        simulatedHands[0].splice(leadIndex, 1);
-        const leadSuit = effectiveSuit(leadCard);
+      for (const suit of bidderSuits) {
+        const bidderCards = bidderHand.filter(card => effectiveSuit(card) === suit);
+        if (!bidderCards.length) continue;
 
-        for (let player = 1; player < playerCount(); player++) {
-          const hand = simulatedHands[player];
-          if (!hand.length) continue;
-          const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
-          const legal = followers.length ? followers : hand;
+        // The weakest card the bidder still holds in this suit must beat
+        // every defender card remaining in the same suit. This guarantees
+        // all cards in that run, not merely the first lead.
+        const weakestBidderCard = [...bidderCards].sort((a, b) => cardRank(a) - cardRank(b))[0];
+        for (const defenderHand of defenders) {
+          const sameSuitCards = defenderHand.filter(card => effectiveSuit(card) === suit);
+          if (sameSuitCards.some(card => !beats(weakestBidderCard, card, suit))) return false;
 
-          if (legal.some(card => beats(card, leadCard, leadSuit))) return false;
-
-          // Preserve the opponent's strongest threats for later tricks.
-          const discard = lowestClaimDiscard(legal);
-          const discardIndex = hand.findIndex(card => card.id === discard.id);
-          hand.splice(discardIndex, 1);
+          // On a non-trump run, a defender who becomes void could trump.
+          // Require enough cards in the led suit to follow every bidder lead,
+          // unless that defender has no trump left at all.
+          if (trumpSuit && suit !== trumpSuit) {
+            const defenderTrumpCount = defenderHand.filter(card => effectiveSuit(card) === trumpSuit).length;
+            if (defenderTrumpCount > 0 && sameSuitCards.length < bidderCards.length) return false;
+          }
         }
       }
 
@@ -5700,6 +5723,13 @@
               <option value="5" ${settings.playerCount === 5 ? "selected" : ""}>5 players</option>
             </select>
           </div>
+          <div class="field" id="threePlayerKittyWrap" ${settings.playerCount === 3 ? "" : "hidden"}>
+            <label for="threePlayerKittySetting">3-player kitty</label>
+            <select id="threePlayerKittySetting">
+              <option value="6" ${settings.threePlayerKittySize === 6 ? "selected" : ""}>6 cards</option>
+              <option value="9" ${settings.threePlayerKittySize === 9 ? "selected" : ""}>9 cards</option>
+            </select>
+          </div>
           <div class="field">
             <label for="rookRankSetting">Rook rank</label>
             <select id="rookRankSetting">
@@ -5725,8 +5755,8 @@
               <input id="showStatsSetting" type="checkbox" ${settings.showStats ? "checked" : ""}>
               Game stats after two hands
             </label>
-            <label class="checkbox-setting" for="callPartnerSetting">
-              <input id="callPartnerSetting" type="checkbox" ${settings.callPartner && settings.playerCount !== 3 ? "checked" : ""} ${settings.playerCount === 3 ? "disabled" : ""}>
+            <label class="checkbox-setting" id="callPartnerWrap" for="callPartnerSetting" ${settings.playerCount === 3 ? "hidden" : ""}>
+              <input id="callPartnerSetting" type="checkbox" ${settings.callPartner && settings.playerCount !== 3 ? "checked" : ""}>
               Call Partner
             </label>
           </div>
@@ -5789,11 +5819,13 @@
       const customWrap = document.getElementById("customScoreWrap");
       const playerCountSelect = document.getElementById("playerCountSetting");
       const callPartnerInput = document.getElementById("callPartnerSetting");
+      const callPartnerWrap = document.getElementById("callPartnerWrap");
+      const threePlayerKittyWrap = document.getElementById("threePlayerKittyWrap");
       const syncCallPartnerForPlayerCount = () => {
         const isThreePlayer = Number(playerCountSelect.value) === 3;
         if (isThreePlayer) callPartnerInput.checked = false;
-        callPartnerInput.disabled = isThreePlayer;
-        callPartnerInput.closest("label")?.classList.toggle("disabled", isThreePlayer);
+        callPartnerWrap.hidden = isThreePlayer;
+        threePlayerKittyWrap.hidden = !isThreePlayer;
       };
       playerCountSelect.addEventListener("change", syncCallPartnerForPlayerCount);
       syncCallPartnerForPlayerCount();
@@ -5805,6 +5837,7 @@
         const oldRank = settings.rookRank;
         const oldPlayerCount = settings.playerCount;
         const oldCallPartner = settings.callPartner;
+        const oldThreePlayerKittySize = settings.threePlayerKittySize;
         const selectedScore = winSelect.value === "custom"
           ? Number(document.getElementById("customScoreSetting").value)
           : Number(winSelect.value);
@@ -5826,6 +5859,9 @@
           showStats: document.getElementById("showStatsSetting").checked,
           callPartner: selectedCallPartner,
           playerCount: selectedPlayerCount,
+          threePlayerKittySize: [6, 9].includes(Number(document.getElementById("threePlayerKittySetting").value))
+            ? Number(document.getElementById("threePlayerKittySetting").value)
+            : DEFAULT_SETTINGS.threePlayerKittySize,
           userName: cleanName(document.getElementById("userNameSetting").value, DEFAULT_SETTINGS.userName),
           botNames: [
             cleanName(document.getElementById("leftNameSetting").value),
@@ -5840,7 +5876,9 @@
         }
         applyTheme(settings.theme);
         closeModal();
-        if (oldPlayerCount !== settings.playerCount || oldCallPartner !== settings.callPartner) {
+        if (oldPlayerCount !== settings.playerCount
+            || oldCallPartner !== settings.callPartner
+            || oldThreePlayerKittySize !== settings.threePlayerKittySize) {
           startNewGame(false);
           showToast(settings.callPartner
             ? `${settings.playerCount}-player Call Partner game started`
@@ -6189,7 +6227,7 @@
       els.kittyReveal.innerHTML = `
         <div class="kitty-reveal-title">Kitty</div>
         <div class="kitty-reveal-cards ${state.nest.length > 6 ? "large-kitty" : ""}">${cards}</div>
-        <div class="kitty-reveal-hint">Click or double-click to add now • automatic in 6 seconds</div>
+        <div class="kitty-reveal-hint">Click to add these cards to your hand</div>
       `;
     }
 
