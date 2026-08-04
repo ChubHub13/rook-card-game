@@ -3178,7 +3178,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.4">v1.1.4</span>
+            <span class="version-badge" title="Version 1.1.5">v1.1.5</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -5849,52 +5849,52 @@
           || state.trick.length !== 0
           || state.hands[0].length === 0) return false;
 
-      // The claim is based only on the bidder's cards. A fixed or called
-      // partner is neither counted as extra control nor treated as an enemy.
-      const bidderTeam = teamOf(0);
+      // This is intentionally stricter than normal claim logic. Every other
+      // player is treated as a possible threat, including a fixed or called
+      // partner. The button appears only when the bidder can lead the strongest
+      // remaining card each time and no legal response can ever win a trick.
       const bidderHand = state.hands[0].map(card => ({ ...card }));
-      const opponents = playerIndexes()
-        .filter(player => player !== 0 && teamOf(player) !== bidderTeam)
-        .map(player => ({
-          player,
-          hand: state.hands[player].map(card => ({ ...card }))
-        }));
+      const otherHands = playerIndexes()
+        .filter(player => player !== 0)
+        .map(player => state.hands[player].map(card => ({ ...card })));
 
       const removeCard = (hand, card) => {
         const index = hand.findIndex(item => item.id === card.id);
         if (index >= 0) hand.splice(index, 1);
       };
-      const legalForLead = (hand, leadSuit) => {
-        const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
-        return followers.length ? followers : hand;
-      };
-      const futureThreat = card => {
-        const suit = effectiveSuit(card);
-        const isTrump = state.trump && state.trump !== "none" && suit === state.trump;
-        return (isTrump ? 1000 : 0) + cardRank(card) * 10 + cardPoints(card);
-      };
-      const preserveThreatsDiscard = legal => [...legal].sort((a, b) =>
-        futureThreat(a) - futureThreat(b)
-        || cardPoints(a) - cardPoints(b)
-        || cardRank(a) - cardRank(b)
-      )[0];
 
       while (bidderHand.length) {
-        // Cash the bidder's strongest remaining card first. This recognizes a
-        // continuous run of top trump that can pull every opposing trump, but
-        // rejects the claim as soon as any opponent has a legal winner.
         const lead = chooseHighestClaimLead(bidderHand);
         const leadSuit = effectiveSuit(lead);
 
-        for (const opponent of opponents) {
-          if (!opponent.hand.length) continue;
-          const legal = legalForLead(opponent.hand, leadSuit);
+        for (const hand of otherHands) {
+          if (!hand.length) continue;
+
+          const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
+          const legal = followers.length ? followers : hand;
+
+          // If any legal card can take the bidder's lead, there is a possible
+          // line of play that loses the trick, so do not offer the claim.
           if (legal.some(card => beats(card, lead, leadSuit))) return false;
-          const played = preserveThreatsDiscard(legal);
-          if (played) removeCard(opponent.hand, played);
+
+          if (followers.length) {
+            // Preserve the opponent's strongest cards for later tricks. This is
+            // the most conservative forced follow and prevents optimistic claims.
+            const played = [...followers].sort((a, b) =>
+              cardRank(a) - cardRank(b)
+              || cardPoints(a) - cardPoints(b)
+            )[0];
+            removeCard(hand, played);
+          }
+
+          // When a player is void, intentionally leave their simulated hand
+          // unchanged. In the real trick they must discard, but preserving every
+          // possible future threat can only make this test stricter, never looser.
         }
+
         removeCard(bidderHand, lead);
       }
+
       return true;
     }
 
