@@ -3178,7 +3178,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.0.9">v1.0.9</span>
+            <span class="version-badge" title="Version 1.1.1">v1.1.1</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3347,7 +3347,7 @@
       5: { handSize: 8, nestSize: 5 }
     };
 
-    const SETTINGS_VERSION = 17;
+    const SETTINGS_VERSION = 18;
     const GAME_SAVE_VERSION = 2;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
     const DEFAULT_SETTINGS = {
@@ -3361,6 +3361,7 @@
       theme: "classic",
       soundEnabled: true,
       showStats: true,
+      biddingEnabled: true,
       callPartner: false,
       playerCount: 4,
       threePlayerKittySize: 9,
@@ -3553,6 +3554,7 @@
           theme: ["classic", "casual"].includes(saved.theme) ? saved.theme : DEFAULT_SETTINGS.theme,
           soundEnabled: saved.soundEnabled !== false,
           showStats: saved.showStats !== false,
+          biddingEnabled: saved.biddingEnabled !== false,
           callPartner: savedPlayerCount === 3 ? false : saved.callPartner === true,
           playerCount: savedPlayerCount,
           threePlayerKittySize: [6, 9].includes(Number(saved.threePlayerKittySize)) ? Number(saved.threePlayerKittySize) : DEFAULT_SETTINGS.threePlayerKittySize,
@@ -3808,17 +3810,28 @@
     }
 
     function isCurrentPartner(player) {
-      if (player === 0) return false;
-      if (settings.callPartner) return state.calledPartner >= 0 && state.calledPartner === player;
-      return playerCount() === 4 && player === 2;
+      if (state.highBidder === null || player === state.highBidder) return false;
+      if (settings.callPartner) {
+        return state.calledPartner >= 0 && player === state.calledPartner;
+      }
+      if (usesFixedTeamScoring()) {
+        return teamOf(player) === teamOf(state.highBidder);
+      }
+      return false;
     }
 
     function teamOf(player) {
-      if (player === 0) return 0;
-      if (settings.callPartner && state.calledPartner !== null) {
-        return state.calledPartner >= 0 && player === state.calledPartner ? 0 : 1;
+      if (usesFixedTeamScoring()) return player % 2;
+
+      // Individual-score games still form temporary sides for each hand:
+      // bidder (and a called partner, if any) against all defenders.
+      if (state.highBidder !== null) {
+        if (player === state.highBidder) return 0;
+        if (settings.callPartner && state.calledPartner >= 0 && player === state.calledPartner) return 0;
+        return 1;
       }
-      return playerCount() === 4 && player === 2 ? 0 : 1;
+
+      return player === 0 ? 0 : 1;
     }
 
     function handTeamMembers(team) {
@@ -3866,16 +3879,20 @@
     }
 
     function teamName(team) {
-      if (settings.callPartner && state.calledPartner !== null) {
+      if (settings.callPartner && state.highBidder !== null) {
         if (team !== 0) return "Defenders";
-        return state.calledPartner >= 0
-          ? `${playerName(0)} & ${playerName(state.calledPartner)}`
-          : playerName(0);
+        if (state.calledPartner >= 0) {
+          return `${playerName(state.highBidder)} & ${playerName(state.calledPartner)}`;
+        }
+        return playerName(state.highBidder);
       }
-      if (playerCount() === 4 && !settings.callPartner) {
+      if (usesFixedTeamScoring()) {
         return team === 0
           ? `${playerName(0)} & ${playerName(2)}`
           : `${playerName(1)} & ${playerName(3)}`;
+      }
+      if (state.highBidder !== null) {
+        return team === 0 ? playerName(state.highBidder) : "Defenders";
       }
       return team === 0 ? playerName(0) : "Defenders";
     }
@@ -4122,24 +4139,133 @@
 
     function continueBidding() {
       if (state.phase !== "bidding") return;
-      state.currentBidder = 0;
+
+      if (!settings.biddingEnabled) {
+        state.auctionStarted = false;
+        state.currentBidder = 0;
+        state.highBid = 0;
+        state.highBidder = null;
+        state.bidTeam = null;
+        state.shootMoon = false;
+        state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
+        setPrompt("Choose your bid", "Rotate hands if desired, set the bid, then take it.");
+        renderAll();
+        return;
+      }
+
+      if (!state.auctionStarted) {
+        state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
+        setPrompt("Review the hands", "Rotate hands if desired, then begin bidding.");
+        renderAll();
+        return;
+      }
+
+      const active = playerIndexes().filter(player => !state.passed[player]);
+      if (state.highBidder !== null && active.length === 1 && active[0] === state.highBidder) {
+        finishBidding();
+        return;
+      }
+      if (!active.length) {
+        resetAuctionAfterNoBid();
+        return;
+      }
+
+      if (state.passed[state.currentBidder]) {
+        state.currentBidder = nextActiveBidder(state.currentBidder);
+      }
+      if (state.currentBidder === null || state.currentBidder === undefined) {
+        resetAuctionAfterNoBid();
+        return;
+      }
+
+      if (state.currentBidder === 0) {
+        const minimum = nextLegalBid();
+        state.bidCandidate = minimum <= 400
+          ? normalizeBidValue(Math.max(state.bidCandidate || minimum, minimum), minimum)
+          : 400;
+        setPrompt(
+          state.highBidder === null ? "Your opening bid" : "Your turn to bid",
+          minimum <= 400 ? `Bid at least ${minimum}, or pass.` : "The bid is already 400. Pass to finish the auction."
+        );
+        renderAll();
+        return;
+      }
+
+      setPrompt("Bidding", `${playerName(state.currentBidder)} is deciding…`);
+      renderAll();
+      scheduleBot(() => botBid(state.currentBidder), botDelay("bid"));
+    }
+
+    function beginAuction() {
+      if (state.phase !== "bidding" || state.dealAnimating || state.animatingPlay) return;
+      state.auctionStarted = true;
+      state.highBid = 0;
+      state.highBidder = null;
+      state.bidTeam = null;
+      state.shootMoon = false;
+      state.passed = playerIndexes().map(() => false);
+      state.lastBidByPlayer = playerIndexes().map(() => null);
+      state.currentBidder = (state.dealer + 1) % playerCount();
+      state.bidCandidate = settings.bidStart;
+      playSound("bid");
+      continueBidding();
+    }
+
+    function nextActiveBidder(fromPlayer) {
+      for (let offset = 1; offset <= playerCount(); offset++) {
+        const candidate = (fromPlayer + offset) % playerCount();
+        if (!state.passed[candidate]) return candidate;
+      }
+      return null;
+    }
+
+    function advanceBidTurn(fromPlayer) {
+      state.currentBidder = nextActiveBidder(fromPlayer);
+      continueBidding();
+    }
+
+    function placeHumanBid() {
+      if (state.phase !== "bidding" || !settings.biddingEnabled || !state.auctionStarted || state.currentBidder !== 0) return;
+      const minimum = nextLegalBid();
+      if (minimum > 400) return;
+      const bid = normalizeBidValue(state.bidCandidate, minimum);
+      state.highBid = bid;
+      state.highBidder = 0;
+      state.shootMoon = bid === 400;
+      state.lastBidByPlayer[0] = bid;
+      playSound("bid");
+      advanceBidTurn(0);
+    }
+
+    function passHumanBid() {
+      if (state.phase !== "bidding" || !settings.biddingEnabled || !state.auctionStarted || state.currentBidder !== 0) return;
+      state.passed[0] = true;
+      state.lastBidByPlayer[0] = "Pass";
+      playSound("pass");
+      advanceBidTurn(0);
+    }
+
+    function resetAuctionAfterNoBid() {
       state.auctionStarted = false;
       state.highBid = 0;
       state.highBidder = null;
       state.bidTeam = null;
       state.shootMoon = false;
-      state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
-      setPrompt("Choose your bid", "Rotate hands if desired, set the bid, then take it.");
+      state.passed = playerIndexes().map(() => false);
+      state.lastBidByPlayer = playerIndexes().map(() => null);
+      state.currentBidder = 0;
+      state.bidCandidate = settings.bidStart;
+      setPrompt("No bid", "Rotate the hands or choose Bitter Bunch, then begin bidding again.");
       renderAll();
     }
 
     function takeSelectedBid() {
-      if (state.phase !== "bidding" || state.animatingPlay || state.dealAnimating) return;
+      if (state.phase !== "bidding" || settings.biddingEnabled || state.animatingPlay || state.dealAnimating) return;
       const bid = normalizeBidValue(state.bidCandidate, 100);
       state.bidCandidate = bid;
       state.highBid = bid;
       state.highBidder = 0;
-      state.bidTeam = 0;
+      state.bidTeam = usesFixedTeamScoring() ? teamOf(0) : 0;
       state.shootMoon = bid === 400;
       state.lastBidByPlayer = playerIndexes().map((_, player) => player === 0 ? bid : null);
       state.auctionStarted = true;
@@ -4222,14 +4348,13 @@
     }
 
     function botBid(player) {
-      if (state.phase !== "bidding" || state.currentBidder !== player) return;
+      if (state.phase !== "bidding" || !settings.biddingEnabled || !state.auctionStarted || state.currentBidder !== player) return;
       const nextBid = nextLegalBid();
       const humanIsHighBidder = state.highBidder === 0;
       const profile = aiProfile();
       const estimatedMax = estimateMaxBid(state.hands[player]);
       let maxBid = estimatedMax + profile.bidBonus - (humanIsHighBidder ? profile.humanLeadPenalty : 0);
       maxBid = Math.max(maxBid, botMoonCeiling(player));
-      const active = playerIndexes().filter(i => !state.passed[i]);
 
       if (state.highBidder === null
           && estimatedMax >= settings.bidStart - 10
@@ -4238,86 +4363,110 @@
         maxBid = Math.max(maxBid, settings.bidStart);
       }
 
-      if (nextBid <= maxBid && nextBid <= 400) {
+      if (nextBid <= 400 && nextBid <= maxBid) {
         state.highBid = nextBid;
         state.highBidder = player;
         state.shootMoon = nextBid === 400;
         state.lastBidByPlayer[player] = nextBid;
-        logMessage(`${playerName(player)} bids ${nextBid}${state.shootMoon ? " as a moon bid" : ""}.`);
         playSound("bid");
-      } else if (active.length > 1) {
+      } else {
         state.passed[player] = true;
         state.lastBidByPlayer[player] = "Pass";
-        logMessage(`${playerName(player)} passes.`);
         playSound("pass");
       }
-
-      state.currentBidder = (state.currentBidder + 1) % playerCount();
-      continueBidding();
+      advanceBidTurn(player);
     }
 
     function estimateMaxBid(hand, randomize = true) {
-      const points = hand.reduce((sum, card) => sum + cardPoints(card), 0);
-      const suitCounts = Object.fromEntries(SUITS.map(suit => [suit, 0]));
-      const suitPower = Object.fromEntries(SUITS.map(suit => [suit, 0]));
-      let topPower = 0;
-      let hasRook = false;
-      let aces = 0;
-      let fourteens = 0;
-
-      for (const card of hand) {
-        if (card.rook) {
-          hasRook = true;
-          topPower += 10;
-          continue;
-        }
-        suitCounts[card.suit] += 1;
-        if (card.value === 1) {
-          aces += 1;
-          topPower += 13;
-          suitPower[card.suit] += 18;
-        } else if (card.value === 14) {
-          fourteens += 1;
-          topPower += 7;
-          suitPower[card.suit] += 10;
-        } else if (card.value === 13) {
-          topPower += 4;
-          suitPower[card.suit] += 6;
-        } else if (card.value === 12) {
-          topPower += 2;
-          suitPower[card.suit] += 3;
-        }
-        suitPower[card.suit] += 2 + cardPoints(card) * 0.3;
-      }
-
-      const longest = Math.max(...Object.values(suitCounts));
-      const bestSuitPower = Math.max(...SUITS.map(suit => suitPower[suit] + suitCounts[suit] * 3));
-      const colorStrength = longest * 3 + (longest >= 5 ? 5 : 0);
-      const rookBoost = hasRook && settings.rookRank === "high" ? 4 : 0;
-      const exceptional = bestSuitPower >= 43 || (longest >= 5 && hasRook && aces >= 1) || aces >= 3;
-      const elite = bestSuitPower >= 55 || (longest >= 6 && hasRook && aces >= 2) || (aces >= 3 && fourteens >= 2);
-      const strongHandBoost = elite ? 25 : exceptional ? 14 : 0;
+      const strength = analyzeBotBidHand(hand);
       const profile = aiProfile();
+      const trumpSuit = strength.bestTrump;
+      const trumpCount = strength.potentialTrumpCount;
+      const handPoints = hand.reduce((sum, card) => sum + cardPoints(card), 0);
+
+      const topRunForSuit = suit => {
+        const order = suit === trumpSuit
+          ? (settings.rookRank === "high"
+            ? ["rook", 1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
+            : settings.rookRank === "low"
+              ? [1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, "rook"]
+              : [1, 14, 13, 12, 11, "rook", 10, 9, 8, 7, 6, 5])
+          : [1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5];
+        let run = 0;
+        for (const rank of order) {
+          const held = rank === "rook"
+            ? hand.some(card => card.rook)
+            : hand.some(card => !card.rook && card.suit === suit && card.value === rank);
+          if (!held) break;
+          run += 1;
+        }
+        return run;
+      };
+
+      const trumpTopRun = topRunForSuit(trumpSuit);
+      const sideRuns = SUITS
+        .filter(suit => suit !== trumpSuit)
+        .map(suit => topRunForSuit(suit));
+      const secondaryControl = sideRuns.reduce((sum, run) => sum + Math.min(2, run), 0);
+      const secondaryAces = hand.filter(card =>
+        !card.rook && card.suit !== trumpSuit && card.value === 1
+      ).length;
+
+      // Estimate unknown kitty help from the cards that are still unseen. This
+      // does not peek at the actual kitty.
+      const unknownCards = Math.max(1, 45 - hand.length);
+      const possibleTrumpCards = 12; // 11 color cards plus the Rook.
+      const expectedKittyTrump = discardCount()
+        * Math.max(0, possibleTrumpCards - trumpCount)
+        / unknownCards;
+      const expectedKittyCounters = discardCount()
+        * Math.max(0, 180 - handPoints)
+        / unknownCards;
+
+      // Estimate normal partner help without inspecting a particular partner's
+      // cards. Individual/no-partner games receive no partner allowance.
+      const partnerEstimate = usesFixedTeamScoring()
+        ? 28
+        : settings.callPartner
+          ? 22
+          : 0;
+
+      const base = 72;
+      const colorDepth = Math.max(0, trumpCount - 3) * 5.5;
+      const trumpControl = trumpTopRun * 9;
+      const sideControl = secondaryControl * 4.5 + secondaryAces * 3;
+      const counterValue = handPoints * .18;
+      const kittyPotential = expectedKittyTrump * 3 + expectedKittyCounters * .18;
       const jitter = randomize
         ? Math.floor(Math.random() * profile.jitter) - Math.floor(profile.jitter * .65)
         : 0;
-      const estimate = 64 + points * 0.42 + topPower * 0.62 + colorStrength + rookBoost + strongHandBoost + jitter;
-      const bidStrength = analyzeBotBidHand(hand);
+      let estimate = base
+        + partnerEstimate
+        + colorDepth
+        + trumpControl
+        + sideControl
+        + counterValue
+        + kittyPotential
+        + jitter;
 
-      // Bids above 160 require both several 1s and at least six likely trump cards.
+      // Do not let bots push past 160 unless the hand has both real trump
+      // length and several top cards. A 200 bid still requires every card in
+      // the dealt hand to be covered as a likely winner.
       let ceiling = 160;
-      if (bidStrength.aces >= 2 && bidStrength.potentialTrumpCount >= 6) {
-        ceiling = elite ? 195 : exceptional ? 180 : 170;
+      if (trumpCount >= 6 && strength.aces >= 2 && trumpTopRun >= 2) {
+        ceiling = 180;
       }
+      if (trumpCount >= 7 && strength.aces >= 2 && trumpTopRun >= 4 && secondaryControl >= 2) {
+        ceiling = 195;
+      }
+      if (strength.fullCoverage) ceiling = 200;
 
-      // A bot only bids 200 when all ten cards are covered as likely trick winners.
-      if (bidStrength.fullCoverage) ceiling = 200;
-
-      return clamp(Math.floor(estimate / 5) * 5, 95, ceiling);
+      estimate = Math.floor(estimate / 5) * 5;
+      return clamp(estimate, 95, ceiling);
     }
 
     function finishBidding() {
-      state.bidTeam = teamOf(state.highBidder);
+      state.bidTeam = usesFixedTeamScoring() ? teamOf(state.highBidder) : 0;
       state.phase = "pickup";
       state.shootMoon = state.highBid === 400;
       const winningBidLabel = state.shootMoon ? `${state.highBid} • Moon bid` : state.highBid;
@@ -4557,13 +4706,44 @@
 
     function afterDiscardsReady() {
       if (settings.callPartner && state.calledPartner === null) {
-        state.phase = "callPartner";
-        setPrompt("Call your partner", "Choose one card. Its holder becomes your partner for this hand.");
-        renderAll();
-        requestAnimationFrame(openCallPartnerPicker);
+        if (state.highBidder === 0) {
+          state.phase = "callPartner";
+          setPrompt("Call your partner", "Choose one card. Its holder becomes your partner for this hand.");
+          renderAll();
+          requestAnimationFrame(openCallPartnerPicker);
+        } else {
+          selectBotCalledPartner(state.highBidder);
+          beginPlay();
+        }
       } else {
         beginPlay();
       }
+    }
+
+    function selectBotCalledPartner(bidder) {
+      const candidates = state.hands.flatMap((hand, player) =>
+        player === bidder ? [] : hand.map(card => ({ card, player }))
+      );
+      if (!candidates.length) {
+        state.calledCard = null;
+        state.calledPartner = -1;
+        state.calledPartnerRevealed = false;
+        return;
+      }
+      const chosen = candidates.map(entry => {
+        const card = entry.card;
+        let score = card.rook ? 34 : card.value === 1 ? 32 : card.value === 14 ? 21 : card.value === 13 ? 14 : cardRank(card);
+        if (state.trump !== "none" && effectiveSuit(card) === state.trump) score += 7;
+        score += cardPoints(card) * .35;
+        return { ...entry, score };
+      }).sort((a, b) => b.score - a.score || cardRank(b.card) - cardRank(a.card))[0];
+
+      state.calledCard = { ...chosen.card };
+      state.calledPartner = chosen.player;
+      state.calledPartnerRevealed = false;
+      state.calledCardLeadBack = false;
+      state.calledPartnerTrumpReturn = false;
+      logMessage(`${playerName(bidder)} calls ${cardName(chosen.card)}.`);
     }
 
     function openCallPartnerPicker() {
@@ -5149,6 +5329,8 @@
       if (!winningPlay || effectiveSuit(winningPlay.card) !== state.trump) return null;
       if (cardRank(winningPlay.card) < 14) return null;
 
+      if (!opponentsStillHoldTrump(player)) return null;
+
       const trumps = legal.filter(card => effectiveSuit(card) === state.trump);
       if (!trumps.length) return null;
 
@@ -5236,21 +5418,27 @@
       return captured + trickPoints > 200 - state.highBid;
     }
 
-    function defendersStillHoldTrump() {
-      if (!settings.callPartner || !state.trump || state.trump === "none" || state.calledPartner === null) return false;
-      return playerIndexes().some(player =>
-        player !== state.highBidder
-        && player !== state.calledPartner
-        && state.hands[player].some(card => effectiveSuit(card) === state.trump)
+    function opponentsStillHoldTrump(player) {
+      if (!state.trump || state.trump === "none") return false;
+      return playerIndexes().some(opponent =>
+        opponent !== player
+        && teamOf(opponent) !== teamOf(player)
+        && state.hands[opponent].some(card => effectiveSuit(card) === state.trump)
       );
     }
 
+    function defendersStillHoldTrump() {
+      if (!settings.callPartner || state.calledPartner === null || state.calledPartner < 0) return false;
+      return opponentsStillHoldTrump(state.calledPartner);
+    }
+
     function calledPartnerShouldAvoidTrumpLead(player) {
-      return settings.callPartner
-        && player === state.calledPartner
+      // Once every defender is out of trump, a bot partner should stop pulling
+      // trump from the bidder and lead another color whenever possible.
+      return isCurrentPartner(player)
         && state.trump
         && state.trump !== "none"
-        && !defendersStillHoldTrump();
+        && !opponentsStillHoldTrump(player);
     }
 
     function opponentCanBeatLead(player, card) {
@@ -5361,36 +5549,52 @@
           || state.trick.length !== 0
           || state.hands[0].length === 0) return false;
 
-      // This deliberately uses only the bidder's cards. The button appears
-      // only when every remaining bidder card is provably unbeatable.
-      // It does not rely on the partner taking a trick or returning a lead.
-      const bidderHand = state.hands[0];
-      const defenders = state.hands.slice(1);
-      const trumpSuit = state.trump && state.trump !== "none" ? state.trump : null;
-      const bidderSuits = [...new Set(bidderHand.map(effectiveSuit))];
+      // The claim is based only on the bidder's cards. A fixed or called
+      // partner is neither counted as extra control nor treated as an enemy.
+      const bidderTeam = teamOf(0);
+      const bidderHand = state.hands[0].map(card => ({ ...card }));
+      const opponents = playerIndexes()
+        .filter(player => player !== 0 && teamOf(player) !== bidderTeam)
+        .map(player => ({
+          player,
+          hand: state.hands[player].map(card => ({ ...card }))
+        }));
 
-      for (const suit of bidderSuits) {
-        const bidderCards = bidderHand.filter(card => effectiveSuit(card) === suit);
-        if (!bidderCards.length) continue;
+      const removeCard = (hand, card) => {
+        const index = hand.findIndex(item => item.id === card.id);
+        if (index >= 0) hand.splice(index, 1);
+      };
+      const legalForLead = (hand, leadSuit) => {
+        const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
+        return followers.length ? followers : hand;
+      };
+      const futureThreat = card => {
+        const suit = effectiveSuit(card);
+        const isTrump = state.trump && state.trump !== "none" && suit === state.trump;
+        return (isTrump ? 1000 : 0) + cardRank(card) * 10 + cardPoints(card);
+      };
+      const preserveThreatsDiscard = legal => [...legal].sort((a, b) =>
+        futureThreat(a) - futureThreat(b)
+        || cardPoints(a) - cardPoints(b)
+        || cardRank(a) - cardRank(b)
+      )[0];
 
-        // The weakest card the bidder still holds in this suit must beat
-        // every defender card remaining in the same suit. This guarantees
-        // all cards in that run, not merely the first lead.
-        const weakestBidderCard = [...bidderCards].sort((a, b) => cardRank(a) - cardRank(b))[0];
-        for (const defenderHand of defenders) {
-          const sameSuitCards = defenderHand.filter(card => effectiveSuit(card) === suit);
-          if (sameSuitCards.some(card => !beats(weakestBidderCard, card, suit))) return false;
+      while (bidderHand.length) {
+        // Cash the bidder's strongest remaining card first. This recognizes a
+        // continuous run of top trump that can pull every opposing trump, but
+        // rejects the claim as soon as any opponent has a legal winner.
+        const lead = chooseHighestClaimLead(bidderHand);
+        const leadSuit = effectiveSuit(lead);
 
-          // On a non-trump run, a defender who becomes void could trump.
-          // Require enough cards in the led suit to follow every bidder lead,
-          // unless that defender has no trump left at all.
-          if (trumpSuit && suit !== trumpSuit) {
-            const defenderTrumpCount = defenderHand.filter(card => effectiveSuit(card) === trumpSuit).length;
-            if (defenderTrumpCount > 0 && sameSuitCards.length < bidderCards.length) return false;
-          }
+        for (const opponent of opponents) {
+          if (!opponent.hand.length) continue;
+          const legal = legalForLead(opponent.hand, leadSuit);
+          if (legal.some(card => beats(card, lead, leadSuit))) return false;
+          const played = preserveThreatsDiscard(legal);
+          if (played) removeCard(opponent.hand, played);
         }
+        removeCard(bidderHand, lead);
       }
-
       return true;
     }
 
@@ -5441,7 +5645,7 @@
     }
 
     function goDown() {
-      if (state.phase !== "playing" || state.bidTeam !== 0 || state.highBidder === null) return;
+      if (state.phase !== "playing" || state.highBidder !== 0) return;
 
       gameToken += 1;
       clearTimeout(botTimer);
@@ -5487,7 +5691,7 @@
       renderAll();
       saveGameState();
       playSound(gameWinner !== null ? "win" : "set");
-      openScoreModal(handPoints, changes, false, gameWinner, true);
+      openScoreModal(handPoints, changes, false, gameWinner, true, null, state.nest.map(card => ({ ...card })));
     }
 
     function scoreHand(claimHands = null) {
@@ -5564,7 +5768,7 @@
       return leaders.length === 1 ? leaders[0].index : null;
     }
 
-    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false, claimHands = null) {
+    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false, claimHands = null, kittyCards = null) {
       const totalAvailablePoints = points.reduce((sum, value) => sum + Number(value || 0), 0);
       const scoreCards = usesFixedTeamScoring()
         ? [0, 1].map(team => `
@@ -5599,6 +5803,16 @@
         : state.shootMoon
           ? `${teamName(state.bidTeam)} ${madeBid ? `captured all ${totalAvailablePoints} points and made` : "did not capture every point and failed"} the ${state.highBid} moon bid.`
           : `${teamName(state.bidTeam)} ${madeBid ? "made" : "did not make"} the ${state.highBid} bid.`;
+      const kittyReveal = wentDown && Array.isArray(kittyCards) && kittyCards.length
+        ? `
+          <section class="claim-score-section" aria-label="Kitty cards">
+            <div class="claim-score-heading">Returned Kitty</div>
+            <div class="claim-reveal-cards">
+              ${kittyCards.map(card => cardHtml(card, "claim-reveal-card")).join("")}
+            </div>
+          </section>
+        `
+        : "";
       const claimReveal = Array.isArray(claimHands) && claimHands.length
         ? `
           <section class="claim-score-section" aria-label="Remaining cards">
@@ -5621,6 +5835,7 @@
         <p class="table-dialog-summary">${escapeHtml(bidSummary)}</p>
         ${partnerSummary}
         ${winnerText}
+        ${kittyReveal}
         ${claimReveal}
         <div class="summary-grid">${scoreCards}</div>
         <div class="modal-actions">
@@ -5628,7 +5843,7 @@
             ? `<button class="btn primary" id="nextHandButton">Deal Next Hand</button>`
             : `<button class="btn" id="closeGameButton">Review Table</button><button class="btn primary" id="playAgainButton">Play Again</button>`}
         </div>
-      `, claimReveal ? "score-dialog claim-score-dialog" : "score-dialog");
+      `, (claimReveal || kittyReveal) ? "score-dialog claim-score-dialog" : "score-dialog");
 
       if (gameWinner === null) {
         els.tableDialog.querySelector("#nextHandButton").addEventListener("click", () => {
@@ -5687,7 +5902,7 @@
     }
 
     function canRotateHands() {
-      return state.phase === "bidding" && state.highBidder === null && state.cardsPlayed === 0 && !state.animatingPlay && !state.dealAnimating;
+      return state.phase === "bidding" && !state.auctionStarted && state.highBidder === null && state.cardsPlayed === 0 && !state.animatingPlay && !state.dealAnimating;
     }
 
     function openSettings() {
@@ -5754,6 +5969,10 @@
             <label class="checkbox-setting" for="showStatsSetting">
               <input id="showStatsSetting" type="checkbox" ${settings.showStats ? "checked" : ""}>
               Game stats after two hands
+            </label>
+            <label class="checkbox-setting" for="biddingEnabledSetting">
+              <input id="biddingEnabledSetting" type="checkbox" ${settings.biddingEnabled ? "checked" : ""}>
+              Bot bidding
             </label>
             <label class="checkbox-setting" id="callPartnerWrap" for="callPartnerSetting" ${settings.playerCount === 3 ? "hidden" : ""}>
               <input id="callPartnerSetting" type="checkbox" ${settings.callPartner && settings.playerCount !== 3 ? "checked" : ""}>
@@ -5838,6 +6057,7 @@
         const oldPlayerCount = settings.playerCount;
         const oldCallPartner = settings.callPartner;
         const oldThreePlayerKittySize = settings.threePlayerKittySize;
+        const oldBiddingEnabled = settings.biddingEnabled;
         const selectedScore = winSelect.value === "custom"
           ? Number(document.getElementById("customScoreSetting").value)
           : Number(winSelect.value);
@@ -5857,6 +6077,7 @@
           theme: document.querySelector('input[name="themeSetting"]:checked')?.value || "classic",
           soundEnabled: document.getElementById("soundEnabledSetting").checked,
           showStats: document.getElementById("showStatsSetting").checked,
+          biddingEnabled: document.getElementById("biddingEnabledSetting").checked,
           callPartner: selectedCallPartner,
           playerCount: selectedPlayerCount,
           threePlayerKittySize: [6, 9].includes(Number(document.getElementById("threePlayerKittySetting").value))
@@ -5878,7 +6099,8 @@
         closeModal();
         if (oldPlayerCount !== settings.playerCount
             || oldCallPartner !== settings.callPartner
-            || oldThreePlayerKittySize !== settings.threePlayerKittySize) {
+            || oldThreePlayerKittySize !== settings.threePlayerKittySize
+            || oldBiddingEnabled !== settings.biddingEnabled) {
           startNewGame(false);
           showToast(settings.callPartner
             ? `${settings.playerCount}-player Call Partner game started`
@@ -6035,7 +6257,7 @@
       renderControls();
       renderStatsTicker();
       els.rotateButton.disabled = !canRotateHands();
-      els.goDownButton.hidden = !(state.phase === "playing" && state.bidTeam === 0 && state.trick.length < playerCount());
+      els.goDownButton.hidden = !(state.phase === "playing" && state.highBidder === 0 && state.trick.length < playerCount());
       document.querySelector(".table-shell").dataset.playerCount = String(playerCount());
       els.nestLabel.textContent = `${discardCount()}-card nest`;
       saveGameState();
@@ -6049,7 +6271,18 @@
     }
 
     function renderBidBoard() {
-      if (state.phase === "bidding" && state.highBidder === null) {
+      if (state.phase === "bidding" && settings.biddingEnabled) {
+        if (!state.auctionStarted) {
+          els.bidWinnerName.textContent = "Bidding";
+          els.bidWinnerValue.textContent = "Ready";
+        } else if (state.highBidder === null) {
+          els.bidWinnerName.textContent = "Opening bid";
+          els.bidWinnerValue.textContent = settings.bidStart;
+        } else {
+          els.bidWinnerName.textContent = playerName(state.highBidder);
+          els.bidWinnerValue.textContent = state.highBid;
+        }
+      } else if (state.phase === "bidding" && state.highBidder === null) {
         els.bidWinnerName.textContent = "Your bid";
         els.bidWinnerValue.textContent = state.bidCandidate;
       } else if (state.highBidder === null || state.highBid <= 0) {
@@ -6059,7 +6292,8 @@
         els.bidWinnerName.textContent = playerName(state.highBidder);
         els.bidWinnerValue.textContent = state.highBid;
       }
-      const editable = state.phase === "bidding" && state.highBidder === null;
+      const editable = state.phase === "bidding"
+        && (!settings.biddingEnabled || (state.auctionStarted && state.currentBidder === 0));
       els.bidWinnerDisplay.disabled = !editable;
       els.bidWinnerDisplay.classList.toggle("editable", editable);
       els.bidWinnerDisplay.title = editable ? "Click to choose your bid" : "Current bid";
@@ -6175,7 +6409,9 @@
       } else if (!state.trump) {
         els.trumpDot.style.background = "#777";
         mainText = state.phase === "bidding"
-          ? `Set bid • ${state.bidCandidate}`
+          ? (settings.biddingEnabled
+            ? (state.highBidder === null ? "Bidding" : `Bid ${state.highBid}`)
+            : `Set bid • ${state.bidCandidate}`)
           : state.phase === "kittyReveal"
             ? "Kitty"
             : "No trump selected";
@@ -6371,42 +6607,81 @@
       }
 
       if (state.phase === "bidding") {
-        const minBid = 100;
-        state.bidCandidate = normalizeBidValue(state.bidCandidate, minBid);
-        const picker = document.createElement("div");
-        picker.className = "bid-picker direct-bid-picker";
-        picker.innerHTML = `
-          <label class="bid-entry-label" for="bidValueInput">Your bid</label>
-          <select class="bid-value-input" id="bidValueInput" aria-label="Bid amount">
-            ${bidOptionsHtml(state.bidCandidate)}
-          </select>
-        `;
-        els.controls.appendChild(picker);
+        if (settings.biddingEnabled && !state.auctionStarted) {
+          const actionGroup = document.createElement("div");
+          actionGroup.className = "bid-action-group";
+          const beginButton = document.createElement("button");
+          beginButton.className = "btn primary";
+          beginButton.textContent = "Begin Bidding";
+          beginButton.addEventListener("click", beginAuction);
+          const bitterButton = document.createElement("button");
+          bitterButton.className = "btn bitter-bunch";
+          bitterButton.textContent = "Bitter Bunch";
+          bitterButton.title = "Throw in all hands and redeal";
+          bitterButton.addEventListener("click", bitterBunch);
+          actionGroup.append(beginButton, bitterButton);
+          els.controls.appendChild(actionGroup);
+          return;
+        }
 
-        const input = picker.querySelector("#bidValueInput");
-        const commitInput = () => {
-          state.bidCandidate = normalizeBidValue(input.value, minBid);
-          input.value = String(state.bidCandidate);
-          els.bidWinnerValue.textContent = state.bidCandidate;
-        };
-        input.addEventListener("change", commitInput);
+        if (settings.biddingEnabled && state.auctionStarted && state.currentBidder !== 0) {
+          const waiting = document.createElement("div");
+          waiting.className = "bid-picker direct-bid-picker";
+          waiting.innerHTML = `<span class="bid-entry-label">Current bid</span><strong>${state.highBid || "—"}</strong>`;
+          els.controls.appendChild(waiting);
+          return;
+        }
 
-        const actionGroup = document.createElement("div");
-        actionGroup.className = "bid-action-group";
-        const takeButton = document.createElement("button");
-        takeButton.className = "btn primary";
-        takeButton.textContent = "Take Bid";
-        takeButton.addEventListener("click", () => {
-          commitInput();
-          takeSelectedBid();
-        });
-        const bitterButton = document.createElement("button");
-        bitterButton.className = "btn bitter-bunch";
-        bitterButton.textContent = "Bitter Bunch";
-        bitterButton.title = "Throw in all hands and redeal";
-        bitterButton.addEventListener("click", bitterBunch);
-        actionGroup.append(takeButton, bitterButton);
-        els.controls.appendChild(actionGroup);
+        const minBid = settings.biddingEnabled ? nextLegalBid() : 100;
+        if (!settings.biddingEnabled || minBid <= 400) {
+          state.bidCandidate = normalizeBidValue(state.bidCandidate, Math.min(minBid, 400));
+          const values = bidValues().filter(value => !settings.biddingEnabled || value >= minBid);
+          const picker = document.createElement("div");
+          picker.className = "bid-picker direct-bid-picker";
+          picker.innerHTML = `
+            <label class="bid-entry-label" for="bidValueInput">${settings.biddingEnabled ? "Your bid" : "Bid"}</label>
+            <select class="bid-value-input" id="bidValueInput" aria-label="Bid amount">
+              ${values.map(value => `<option value="${value}" ${value === state.bidCandidate ? "selected" : ""}>${value}</option>`).join("")}
+            </select>
+          `;
+          els.controls.appendChild(picker);
+          const input = picker.querySelector("#bidValueInput");
+          const commitInput = () => {
+            state.bidCandidate = normalizeBidValue(input.value, Math.min(minBid, 400));
+            input.value = String(state.bidCandidate);
+            els.bidWinnerValue.textContent = state.bidCandidate;
+          };
+          input.addEventListener("change", commitInput);
+
+          const actionGroup = document.createElement("div");
+          actionGroup.className = "bid-action-group";
+          const bidButton = document.createElement("button");
+          bidButton.className = "btn primary";
+          bidButton.textContent = settings.biddingEnabled ? "Bid" : "Take Bid";
+          bidButton.addEventListener("click", () => {
+            commitInput();
+            settings.biddingEnabled ? placeHumanBid() : takeSelectedBid();
+          });
+          actionGroup.appendChild(bidButton);
+          if (settings.biddingEnabled) {
+            const passButton = document.createElement("button");
+            passButton.className = "btn";
+            passButton.textContent = "Pass";
+            passButton.addEventListener("click", passHumanBid);
+            actionGroup.appendChild(passButton);
+          } else {
+            const bitterButton = document.createElement("button");
+            bitterButton.className = "btn bitter-bunch";
+            bitterButton.textContent = "Bitter Bunch";
+            bitterButton.title = "Throw in all hands and redeal";
+            bitterButton.addEventListener("click", bitterBunch);
+            actionGroup.appendChild(bitterButton);
+          }
+          els.controls.appendChild(actionGroup);
+          return;
+        }
+
+        if (settings.biddingEnabled) addControlButton("Pass", "", passHumanBid);
         return;
       }
 
@@ -6418,9 +6693,7 @@
       }
 
       if (state.phase === "playing") {
-        const beforeFirstCard = state.highBidder === 0
-          && state.cardsPlayed === 0
-          && state.trick.length === 0;
+        const beforeFirstCard = state.highBidder === 0 && state.cardsPlayed === 0 && state.trick.length === 0;
         if (beforeFirstCard) {
           addControlButton("Change Kitty", "", changeKittyBeforePlay);
           addControlButton("Change Trump", "", () => openTrumpPicker(true));
