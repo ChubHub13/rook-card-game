@@ -3178,7 +3178,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.1">v1.1.1</span>
+            <span class="version-badge" title="Version 1.1.4">v1.1.4</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3350,6 +3350,9 @@
     const SETTINGS_VERSION = 18;
     const GAME_SAVE_VERSION = 2;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
+    const BID_STUDY_KEY = "rookBidStudyV1";
+    const BID_STUDY_VERSION = 1;
+    const BID_STUDY_TARGET = 5;
     const DEFAULT_SETTINGS = {
       settingsVersion: SETTINGS_VERSION,
       rookRank: "10.5",
@@ -3388,6 +3391,7 @@
     };
 
     let settings = loadSettings();
+    let bidStudy = loadBidStudy();
     applyTheme(settings.theme);
     let gameToken = 0;
     let botTimer = null;
@@ -3423,6 +3427,7 @@
       currentBidder: 0,
       auctionStarted: false,
       bidCandidate: settings.bidStart,
+      bidStudySnapshot: null,
       bidTeam: null,
       calledCard: null,
       calledPartner: null,
@@ -3570,6 +3575,260 @@
 
     function saveSettings() {
       localStorage.setItem("rookPartnershipSettings", JSON.stringify(settings));
+    }
+
+
+    function newBidStudy() {
+      return {
+        version: BID_STUDY_VERSION,
+        active: true,
+        completed: false,
+        startedAt: Date.now(),
+        completedAt: null,
+        samples: []
+      };
+    }
+
+    function loadBidStudy() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(BID_STUDY_KEY) || "null");
+        if (!saved || saved.version !== BID_STUDY_VERSION || !Array.isArray(saved.samples)) {
+          return newBidStudy();
+        }
+        const samples = saved.samples.slice(0, BID_STUDY_TARGET);
+        return {
+          version: BID_STUDY_VERSION,
+          active: saved.active !== false && samples.length < BID_STUDY_TARGET,
+          completed: samples.length >= BID_STUDY_TARGET || saved.completed === true,
+          startedAt: Number(saved.startedAt) || Date.now(),
+          completedAt: Number(saved.completedAt) || null,
+          samples
+        };
+      } catch (error) {
+        return newBidStudy();
+      }
+    }
+
+    function saveBidStudy() {
+      try {
+        localStorage.setItem(BID_STUDY_KEY, JSON.stringify(bidStudy));
+      } catch (error) {
+        // Bid study is optional when browser storage is unavailable.
+      }
+    }
+
+    function resetBidStudy() {
+      bidStudy = newBidStudy();
+      saveBidStudy();
+      state.bidStudySnapshot = null;
+    }
+
+    function bidStudyIsActive() {
+      return bidStudy.active === true && bidStudy.samples.length < BID_STUDY_TARGET;
+    }
+
+    function studyCardData(card) {
+      return card.rook
+        ? { rook: true }
+        : { suit: card.suit, value: card.value };
+    }
+
+    function studyCardName(card) {
+      return card.rook ? "Rook" : `${SUIT_LABELS[card.suit]} ${card.value}`;
+    }
+
+    function bidStudyHandFeatures(hand) {
+      const strength = analyzeBotBidHand(hand);
+      return {
+        bestTrump: strength.bestTrump,
+        likelyTrump: strength.potentialTrumpCount,
+        ones: strength.aces,
+        rook: strength.hasRook,
+        counters: hand.reduce((sum, card) => sum + cardPoints(card), 0),
+        coveredTricks: strength.coveredTricks
+      };
+    }
+
+    function captureBidStudySnapshot(bid) {
+      if (!bidStudyIsActive()) return;
+      if (!state.bidStudySnapshot) {
+        const hand = (state.hands[0] || []).map(card => ({ ...card }));
+        state.bidStudySnapshot = {
+          hand: hand.map(studyCardData),
+          features: bidStudyHandFeatures(hand),
+          modelBid: estimateMaxBid(hand, false),
+          playerCount: playerCount(),
+          callPartner: settings.callPartner === true,
+          kittySize: discardCount(),
+          handNumber: state.handNumber,
+          bid: normalizeBidValue(bid, 100)
+        };
+      } else {
+        state.bidStudySnapshot.bid = normalizeBidValue(bid, 100);
+      }
+    }
+
+    function average(values) {
+      if (!values.length) return 0;
+      return values.reduce((sum, value) => sum + Number(value || 0), 0) / values.length;
+    }
+
+    function median(values) {
+      if (!values.length) return 0;
+      const sorted = values.map(Number).sort((a, b) => a - b);
+      const middle = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+    }
+
+    function roundedFive(value) {
+      return Math.round(Number(value || 0) / 5) * 5;
+    }
+
+    function bidStudySummary() {
+      const samples = bidStudy.samples;
+      const normalHands = samples.filter(sample => sample.bid < 400);
+      const averageBid = roundedFive(average(normalHands.map(sample => sample.bid)));
+      const averagePoints = roundedFive(average(samples.map(sample => sample.points)));
+      const madeCount = samples.filter(sample => sample.madeBid).length;
+      const cushions = normalHands.map(sample => sample.points - sample.bid);
+      const modelErrors = normalHands.map(sample => sample.points - sample.modelBid);
+      return {
+        averageBid,
+        averagePoints,
+        madeCount,
+        medianCushion: roundedFive(median(cushions)),
+        modelAdjustment: clamp(roundedFive(median(modelErrors)), -40, 40)
+      };
+    }
+
+    function bidStudyModelAdjustment() {
+      if (!bidStudy.completed || bidStudy.samples.length < BID_STUDY_TARGET) return 0;
+      return clamp(bidStudySummary().modelAdjustment, -20, 20);
+    }
+
+    function bidStudyStatusText() {
+      if (bidStudy.completed || bidStudy.samples.length >= BID_STUDY_TARGET) {
+        return `Complete — ${BID_STUDY_TARGET} hands recorded. Results are available below.`;
+      }
+      return `Recording ${bidStudy.samples.length} of ${BID_STUDY_TARGET} completed hands where you win the bid.`;
+    }
+
+    function bidStudyReportText() {
+      const summary = bidStudySummary();
+      const lines = [
+        `Rook Solitaire bid study — ${bidStudy.samples.length} hands`,
+        `Average bid: ${summary.averageBid}`,
+        `Average bidder-side points: ${summary.averagePoints}`,
+        `Bids made: ${summary.madeCount}/${bidStudy.samples.length}`,
+        `Median points above bid: ${summary.medianCushion >= 0 ? "+" : ""}${summary.medianCushion}`,
+        `Current model adjustment indicated: ${summary.modelAdjustment >= 0 ? "+" : ""}${summary.modelAdjustment}`,
+        ""
+      ];
+      bidStudy.samples.forEach((sample, index) => {
+        const features = sample.features;
+        lines.push(
+          `${index + 1}. Bid ${sample.bid}; points ${sample.points}; ${sample.madeBid ? "made" : "set"}; `
+          + `trump ${SUIT_LABELS[sample.trump] || sample.trump}; model ${sample.modelBid}; `
+          + `initial best color ${SUIT_LABELS[features.bestTrump]}; likely trump ${features.likelyTrump}; `
+          + `1s ${features.ones}; Rook ${features.rook ? "yes" : "no"}; counters ${features.counters}; `
+          + `hand: ${sample.hand.map(studyCardName).join(", ")}`
+        );
+      });
+      return lines.join("\n");
+    }
+
+    function bidStudySummaryHtml() {
+      if (!bidStudy.samples.length) {
+        return `<p class="table-dialog-summary">No completed user-bidder hands have been recorded yet.</p>`;
+      }
+      const summary = bidStudySummary();
+      const rows = bidStudy.samples.map((sample, index) => `
+        <div class="summary-card">
+          <strong>Hand ${index + 1}</strong>
+          <div class="big">${sample.points}</div>
+          <span>Bid ${sample.bid} • ${sample.madeBid ? "Made" : "Set"} • ${escapeHtml(SUIT_LABELS[sample.trump] || sample.trump)}</span>
+        </div>
+      `).join("");
+      return `
+        <p class="table-dialog-summary">This study records the next five completed hands where you win the bid. Bot-won hands and Go Down hands are skipped.</p>
+        <div class="summary-grid">${rows}</div>
+        <p class="table-dialog-summary"><strong>Average bid:</strong> ${summary.averageBid} • <strong>Average points:</strong> ${summary.averagePoints} • <strong>Made:</strong> ${summary.madeCount}/${bidStudy.samples.length}</p>
+        <p class="table-dialog-summary"><strong>Median cushion:</strong> ${summary.medianCushion >= 0 ? "+" : ""}${summary.medianCushion} points above the bid • <strong>Estimator indication:</strong> ${summary.modelAdjustment >= 0 ? "+" : ""}${summary.modelAdjustment}</p>
+      `;
+    }
+
+    async function copyBidStudyReport(button) {
+      const report = bidStudyReportText();
+      try {
+        await navigator.clipboard.writeText(report);
+      } catch (error) {
+        const textarea = document.createElement("textarea");
+        textarea.value = report;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+      if (button) button.textContent = "Copied";
+      showToast("Bid study copied");
+    }
+
+    function showBidStudyResults() {
+      els.modalBackdrop.dataset.locked = "false";
+      els.modal.className = "modal";
+      els.modal.innerHTML = `
+        <h2>Five-hand bid study</h2>
+        ${bidStudySummaryHtml()}
+        <div class="modal-actions">
+          <button class="btn" id="restartBidStudy">Restart Study</button>
+          <button class="btn" id="copyBidStudy" ${bidStudy.samples.length ? "" : "disabled"}>Copy Results</button>
+          <button class="btn primary" id="closeBidStudy">Close</button>
+        </div>
+      `;
+      document.getElementById("restartBidStudy").addEventListener("click", () => {
+        resetBidStudy();
+        closeModal();
+        showToast("Five-hand bid study restarted");
+      });
+      document.getElementById("copyBidStudy").addEventListener("click", event => copyBidStudyReport(event.currentTarget));
+      document.getElementById("closeBidStudy").addEventListener("click", closeModal);
+      els.modalBackdrop.classList.add("open");
+      renderStatsTicker();
+    }
+
+    function recordBidStudyHand(completedHand, bidderPoints) {
+      if (!bidStudyIsActive() || completedHand.bidder !== 0 || completedHand.wentDown || !state.bidStudySnapshot) {
+        state.bidStudySnapshot = null;
+        return false;
+      }
+      const snapshot = state.bidStudySnapshot;
+      bidStudy.samples.push({
+        recordedAt: Date.now(),
+        handNumber: completedHand.hand,
+        hand: snapshot.hand,
+        features: snapshot.features,
+        modelBid: snapshot.modelBid,
+        bid: completedHand.bid,
+        points: Number(bidderPoints) || 0,
+        madeBid: completedHand.madeBid === true,
+        trump: completedHand.trump,
+        playerCount: snapshot.playerCount,
+        callPartner: snapshot.callPartner,
+        kittySize: snapshot.kittySize
+      });
+      state.bidStudySnapshot = null;
+      const completedNow = bidStudy.samples.length >= BID_STUDY_TARGET;
+      if (completedNow) {
+        bidStudy.samples = bidStudy.samples.slice(0, BID_STUDY_TARGET);
+        bidStudy.active = false;
+        bidStudy.completed = true;
+        bidStudy.completedAt = Date.now();
+      }
+      saveBidStudy();
+      if (!completedNow) showToast(`Bid study: ${bidStudy.samples.length}/${BID_STUDY_TARGET} hands recorded`);
+      return completedNow;
     }
 
     function applyTheme(theme) {
@@ -4009,6 +4268,7 @@
       state.currentBidder = 0;
       state.auctionStarted = false;
       state.bidCandidate = settings.bidStart;
+      state.bidStudySnapshot = null;
       state.bidTeam = null;
       state.calledCard = null;
       state.calledPartner = null;
@@ -4107,7 +4367,7 @@
         clearDealAnimation();
         state.dealAnimating = false;
         state.phase = "bidding";
-        logMessage(`${playerName(state.dealer)} deals. Review or rotate the hands, then choose your bid.`);
+        logMessage(`${playerName(state.dealer)} deals. Review or rotate the hands, then make your opening bid.`);
         renderAll();
         continueBidding();
       }, total);
@@ -4154,8 +4414,9 @@
       }
 
       if (!state.auctionStarted) {
-        state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
-        setPrompt("Review the hands", "Rotate hands if desired, then begin bidding.");
+        state.currentBidder = 0;
+        state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, settings.bidStart);
+        setPrompt("Your opening bid", "Rotate hands if desired, then choose your opening bid.");
         renderAll();
         return;
       }
@@ -4225,13 +4486,26 @@
     }
 
     function placeHumanBid() {
-      if (state.phase !== "bidding" || !settings.biddingEnabled || !state.auctionStarted || state.currentBidder !== 0) return;
+      if (state.phase !== "bidding" || !settings.biddingEnabled || state.currentBidder !== 0) return;
+
+      if (!state.auctionStarted) {
+        state.auctionStarted = true;
+        state.highBid = 0;
+        state.highBidder = null;
+        state.bidTeam = null;
+        state.shootMoon = false;
+        state.passed = playerIndexes().map(() => false);
+        state.lastBidByPlayer = playerIndexes().map(() => null);
+        state.currentBidder = 0;
+      }
+
       const minimum = nextLegalBid();
       if (minimum > 400) return;
       const bid = normalizeBidValue(state.bidCandidate, minimum);
       state.highBid = bid;
       state.highBidder = 0;
       state.shootMoon = bid === 400;
+      captureBidStudySnapshot(bid);
       state.lastBidByPlayer[0] = bid;
       playSound("bid");
       advanceBidTurn(0);
@@ -4255,7 +4529,7 @@
       state.lastBidByPlayer = playerIndexes().map(() => null);
       state.currentBidder = 0;
       state.bidCandidate = settings.bidStart;
-      setPrompt("No bid", "Rotate the hands or choose Bitter Bunch, then begin bidding again.");
+      setPrompt("No bid", "Rotate the hands, choose another opening bid, or select Bitter Bunch.");
       renderAll();
     }
 
@@ -4267,6 +4541,7 @@
       state.highBidder = 0;
       state.bidTeam = usesFixedTeamScoring() ? teamOf(0) : 0;
       state.shootMoon = bid === 400;
+      captureBidStudySnapshot(bid);
       state.lastBidByPlayer = playerIndexes().map((_, player) => player === 0 ? bid : null);
       state.auctionStarted = true;
       logMessage(`${playerName(0)} takes the bid at ${bid}${state.shootMoon ? " as a moon bid" : ""}.`);
@@ -4404,6 +4679,11 @@
       };
 
       const trumpTopRun = topRunForSuit(trumpSuit);
+      const highTrumpSupport = hand.filter(card =>
+        !card.rook
+        && card.suit === trumpSuit
+        && (card.value === 1 || card.value >= 12)
+      ).length;
       const sideRuns = SUITS
         .filter(suit => suit !== trumpSuit)
         .map(suit => topRunForSuit(suit));
@@ -4437,6 +4717,22 @@
       const sideControl = secondaryControl * 4.5 + secondaryAces * 3;
       const counterValue = handPoints * .18;
       const kittyPotential = expectedKittyTrump * 3 + expectedKittyCounters * .18;
+
+      // The Rook is a 20-point counter as well as a trump card. Give it a
+      // modest extra bidding value only when the hand can support it with
+      // trump length, high trump, or a strong collection of counters.
+      let rookSupportBonus = 0;
+      if (strength.hasRook) {
+        rookSupportBonus += 5;
+        if (trumpCount >= 5) rookSupportBonus += 5;
+        if (highTrumpSupport >= 2 || trumpTopRun >= 2) rookSupportBonus += 5;
+        if (handPoints >= 45) rookSupportBonus += 5;
+        rookSupportBonus = Math.min(15, rookSupportBonus);
+      }
+
+      // Once the five-hand study is complete, use its conservative median
+      // correction to tune future bid estimates without allowing a large jump.
+      const studyAdjustment = bidStudyModelAdjustment();
       const jitter = randomize
         ? Math.floor(Math.random() * profile.jitter) - Math.floor(profile.jitter * .65)
         : 0;
@@ -4447,6 +4743,8 @@
         + sideControl
         + counterValue
         + kittyPotential
+        + rookSupportBonus
+        + studyAdjustment
         + jitter;
 
       // Do not let bots push past 160 unless the hand has both real trump
@@ -4467,6 +4765,8 @@
 
     function finishBidding() {
       state.bidTeam = usesFixedTeamScoring() ? teamOf(state.highBidder) : 0;
+      if (state.highBidder === 0) captureBidStudySnapshot(state.highBid);
+      else state.bidStudySnapshot = null;
       state.phase = "pickup";
       state.shootMoon = state.highBid === 400;
       const winningBidLabel = state.shootMoon ? `${state.highBid} • Moon bid` : state.highBid;
@@ -5737,6 +6037,7 @@
       };
       state.lastHand = completedHand;
       state.scoreHistory.push(completedHand);
+      const bidStudyCompletedNow = recordBidStudyHand(completedHand, handPoints[state.bidTeam]);
 
       logMessage(`${teamName(nestTeam)} earns the 20-point last trick bonus and the nest.`);
       logMessage(state.shootMoon
@@ -5755,7 +6056,7 @@
       renderAll();
       saveGameState();
       playSound(gameWinner !== null ? "win" : madeBid ? "score" : "set");
-      openScoreModal(handPoints, changes, madeBid, gameWinner, false, claimHands);
+      openScoreModal(handPoints, changes, madeBid, gameWinner, false, claimHands, null, bidStudyCompletedNow);
     }
 
     function determineGameWinner() {
@@ -5768,7 +6069,7 @@
       return leaders.length === 1 ? leaders[0].index : null;
     }
 
-    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false, claimHands = null, kittyCards = null) {
+    function openScoreModal(points, changes, madeBid, gameWinner, wentDown = false, claimHands = null, kittyCards = null, bidStudyCompletedNow = false) {
       const totalAvailablePoints = points.reduce((sum, value) => sum + Number(value || 0), 0);
       const scoreCards = usesFixedTeamScoring()
         ? [0, 1].map(team => `
@@ -5813,6 +6114,15 @@
           </section>
         `
         : "";
+      const bidStudySection = bidStudyCompletedNow
+        ? `
+          <section class="claim-score-section" aria-label="Bid study results">
+            <div class="claim-score-heading">Five-Hand Bid Study Complete</div>
+            ${bidStudySummaryHtml()}
+            <div class="modal-actions"><button class="btn" id="copyCompletedBidStudy">Copy Results</button></div>
+          </section>
+        `
+        : "";
       const claimReveal = Array.isArray(claimHands) && claimHands.length
         ? `
           <section class="claim-score-section" aria-label="Remaining cards">
@@ -5837,6 +6147,7 @@
         ${winnerText}
         ${kittyReveal}
         ${claimReveal}
+        ${bidStudySection}
         <div class="summary-grid">${scoreCards}</div>
         <div class="modal-actions">
           ${gameWinner === null
@@ -5844,6 +6155,9 @@
             : `<button class="btn" id="closeGameButton">Review Table</button><button class="btn primary" id="playAgainButton">Play Again</button>`}
         </div>
       `, (claimReveal || kittyReveal) ? "score-dialog claim-score-dialog" : "score-dialog");
+
+      const completedStudyButton = els.tableDialog.querySelector("#copyCompletedBidStudy");
+      if (completedStudyButton) completedStudyButton.addEventListener("click", event => copyBidStudyReport(event.currentTarget));
 
       if (gameWinner === null) {
         els.tableDialog.querySelector("#nextHandButton").addEventListener("click", () => {
@@ -6026,6 +6340,14 @@
             <label for="fourthNameSetting">Bot 4</label>
             <input id="fourthNameSetting" maxlength="18" value="${escapeHtml(settings.botNames[3])}">
           </div>
+          <div class="field full">
+            <label>Five-hand bid study</label>
+            <div class="rules-note" id="bidStudyStatus">${escapeHtml(bidStudyStatusText())}</div>
+            <div class="modal-actions compact-actions">
+              <button class="btn" id="viewBidStudy" ${bidStudy.samples.length ? "" : "disabled"}>View Results</button>
+              <button class="btn" id="resetBidStudy">Restart Study</button>
+            </div>
+          </div>
         </div>
         <div class="rules-note">1s: 15 • 5s: 5 • 10s/14s: 10 • Rook: 20 • Last trick: 20 • A 400 bid requires all 200 points.</div>
         <div class="modal-actions">
@@ -6052,6 +6374,13 @@
         customWrap.style.display = winSelect.value === "custom" ? "grid" : "none";
       });
       document.getElementById("cancelSettings").addEventListener("click", closeModal);
+      document.getElementById("viewBidStudy").addEventListener("click", showBidStudyResults);
+      document.getElementById("resetBidStudy").addEventListener("click", () => {
+        resetBidStudy();
+        document.getElementById("bidStudyStatus").textContent = bidStudyStatusText();
+        document.getElementById("viewBidStudy").disabled = true;
+        showToast("Five-hand bid study restarted");
+      });
       document.getElementById("saveSettings").addEventListener("click", () => {
         const oldRank = settings.rookRank;
         const oldPlayerCount = settings.playerCount;
@@ -6273,8 +6602,8 @@
     function renderBidBoard() {
       if (state.phase === "bidding" && settings.biddingEnabled) {
         if (!state.auctionStarted) {
-          els.bidWinnerName.textContent = "Bidding";
-          els.bidWinnerValue.textContent = "Ready";
+          els.bidWinnerName.textContent = "Your opening bid";
+          els.bidWinnerValue.textContent = state.bidCandidate || settings.bidStart;
         } else if (state.highBidder === null) {
           els.bidWinnerName.textContent = "Opening bid";
           els.bidWinnerValue.textContent = settings.bidStart;
@@ -6293,7 +6622,7 @@
         els.bidWinnerValue.textContent = state.highBid;
       }
       const editable = state.phase === "bidding"
-        && (!settings.biddingEnabled || (state.auctionStarted && state.currentBidder === 0));
+        && (!settings.biddingEnabled || (!state.auctionStarted || state.currentBidder === 0));
       els.bidWinnerDisplay.disabled = !editable;
       els.bidWinnerDisplay.classList.toggle("editable", editable);
       els.bidWinnerDisplay.title = editable ? "Click to choose your bid" : "Current bid";
@@ -6607,23 +6936,6 @@
       }
 
       if (state.phase === "bidding") {
-        if (settings.biddingEnabled && !state.auctionStarted) {
-          const actionGroup = document.createElement("div");
-          actionGroup.className = "bid-action-group";
-          const beginButton = document.createElement("button");
-          beginButton.className = "btn primary";
-          beginButton.textContent = "Begin Bidding";
-          beginButton.addEventListener("click", beginAuction);
-          const bitterButton = document.createElement("button");
-          bitterButton.className = "btn bitter-bunch";
-          bitterButton.textContent = "Bitter Bunch";
-          bitterButton.title = "Throw in all hands and redeal";
-          bitterButton.addEventListener("click", bitterBunch);
-          actionGroup.append(beginButton, bitterButton);
-          els.controls.appendChild(actionGroup);
-          return;
-        }
-
         if (settings.biddingEnabled && state.auctionStarted && state.currentBidder !== 0) {
           const waiting = document.createElement("div");
           waiting.className = "bid-picker direct-bid-picker";
@@ -6664,11 +6976,20 @@
           });
           actionGroup.appendChild(bidButton);
           if (settings.biddingEnabled) {
-            const passButton = document.createElement("button");
-            passButton.className = "btn";
-            passButton.textContent = "Pass";
-            passButton.addEventListener("click", passHumanBid);
-            actionGroup.appendChild(passButton);
+            if (state.auctionStarted) {
+              const passButton = document.createElement("button");
+              passButton.className = "btn";
+              passButton.textContent = "Pass";
+              passButton.addEventListener("click", passHumanBid);
+              actionGroup.appendChild(passButton);
+            } else {
+              const bitterButton = document.createElement("button");
+              bitterButton.className = "btn bitter-bunch";
+              bitterButton.textContent = "Bitter Bunch";
+              bitterButton.title = "Throw in all hands and redeal";
+              bitterButton.addEventListener("click", bitterBunch);
+              actionGroup.appendChild(bitterButton);
+            }
           } else {
             const bitterButton = document.createElement("button");
             bitterButton.className = "btn bitter-bunch";
@@ -6816,6 +7137,9 @@
       resumeSavedGame();
     } else {
       setPrompt("Welcome to Rook Solitaire", "Start a new game to deal the cards.");
+      if (bidStudyIsActive()) {
+        setTimeout(() => showToast(`Bid study ready: ${bidStudy.samples.length}/${BID_STUDY_TARGET}`), 450);
+      }
     }
   </script>
 </body>
