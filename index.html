@@ -1917,9 +1917,11 @@
 
     .sidebar-actions {
       display: grid;
-      gap: 9px;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
       margin-top: auto;
     }
+    #newGameButton, #goDownButton { grid-column: 1 / -1; }
     .sidebar-actions .btn {
       width: 100%;
       min-height: 48px;
@@ -1938,6 +1940,57 @@
 
     .sidebar-actions .sidebar-go-down:hover:not(:disabled) {
       opacity: 1;
+    }
+
+    .stats-modal {
+      width: min(760px, calc(100% - 16px));
+    }
+    .stats-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 7px;
+    }
+    .stats-card {
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 11px;
+      background: rgba(0,0,0,.15);
+      padding: 8px 9px;
+    }
+    .stats-card h3 {
+      margin: 0 0 5px;
+      color: var(--gold);
+      font-size: 13px;
+    }
+    .stats-list {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 3px 10px;
+      font-size: 10px;
+      line-height: 1.25;
+    }
+    .stats-list span:nth-child(odd) { color: var(--muted); }
+    .stats-list strong { text-align: right; }
+    .stats-trump-line {
+      grid-column: 1 / -1;
+      margin-top: 3px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(255,255,255,.07);
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1.3;
+    }
+    .card.discard-hold {
+      outline: 2px solid var(--gold);
+      outline-offset: -2px;
+    }
+    @media (max-width: 760px), (max-height: 520px) {
+      .stats-modal { width: min(660px, calc(100% - 12px)); }
+      .stats-columns { gap: 5px; }
+      .stats-card { padding: 5px 6px; }
+      .stats-card h3 { font-size: 10px; margin-bottom: 3px; }
+      .stats-list { font-size: 8px; gap: 2px 6px; }
+      .stats-trump-line { font-size: 7.5px; }
     }
 
     .game-main {
@@ -2045,13 +2098,14 @@
       .game-sidebar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .sidebar-actions {
         grid-column: 1 / -1;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         grid-template-areas:
-          "new settings"
-          "down down";
+          "new stats settings"
+          "down down down";
         margin: 0;
       }
       #newGameButton { grid-area: new; }
+      #statsButton { grid-area: stats; }
       #settingsButton { grid-area: settings; }
       #goDownButton { grid-area: down; }
       .game-main { grid-template-rows: minmax(500px, 1fr) auto; }
@@ -2802,15 +2856,16 @@
 
       .sidebar-actions {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         grid-template-areas:
-          "new settings"
-          "down down";
+          "new stats settings"
+          "down down down";
         gap: 4px;
         margin-top: auto;
       }
 
       #newGameButton { grid-area: new; }
+      #statsButton { grid-area: stats; }
       #settingsButton { grid-area: settings; }
       #goDownButton { grid-area: down; }
       .sidebar-actions .btn { min-height: 28px; padding: 3px 5px; font-size: 8px; }
@@ -3178,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.5">v1.1.5</span>
+            <span class="version-badge" title="Version 1.1.7">v1.1.7</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3224,6 +3279,7 @@
         <div class="sidebar-actions">
           <button class="btn danger" id="newGameButton" title="Start a new game">＋ <span>New Game</span></button>
           <button class="btn sidebar-go-down" id="goDownButton" title="End this hand and lose the bid points" hidden>↘ <span>Go Down</span></button>
+          <button class="btn" id="statsButton" title="View current and overall statistics">▥ <span>Stats</span></button>
           <button class="btn" id="settingsButton" title="Game settings">⚙ <span>Settings</span></button>
         </div>
       </aside>
@@ -3347,9 +3403,11 @@
       5: { handSize: 8, nestSize: 5 }
     };
 
-    const SETTINGS_VERSION = 18;
+    const SETTINGS_VERSION = 19;
     const GAME_SAVE_VERSION = 2;
     const GAME_SAVE_KEY = "rookPartnershipSavedGame";
+    const OVERALL_STATS_KEY = "rookSolitaireOverallStatsV1";
+    const OVERALL_STATS_VERSION = 1;
     const BID_STUDY_KEY = "rookBidStudyV1";
     const BID_STUDY_VERSION = 1;
     const BID_STUDY_TARGET = 5;
@@ -3392,6 +3450,7 @@
 
     let settings = loadSettings();
     let bidStudy = loadBidStudy();
+    let overallStats = loadOverallStats();
     applyTheme(settings.theme);
     let gameToken = 0;
     let botTimer = null;
@@ -3440,6 +3499,7 @@
       dealRotation: 0,
       cardsPlayed: 0,
       trumpHandRecord: null,
+      bidderVoidSuits: new Set(),
       animatingPlay: false,
       dealAnimating: false,
       winner: null
@@ -3462,6 +3522,7 @@
       tableInfoText: document.getElementById("tableInfoText"),
       rotateButton: document.getElementById("rotateButton"),
       settingsButton: document.getElementById("settingsButton"),
+      statsButton: document.getElementById("statsButton"),
       newGameButton: document.getElementById("newGameButton"),
       goDownButton: document.getElementById("goDownButton"),
       startButton: document.getElementById("startButton"),
@@ -3484,6 +3545,7 @@
     els.newGameButton.addEventListener("click", () => confirmNewGame());
     els.goDownButton.addEventListener("click", goDown);
     els.settingsButton.addEventListener("click", openSettings);
+    els.statsButton.addEventListener("click", openStats);
     els.rotateButton.addEventListener("click", rotateHands);
     els.claimRevealTable.addEventListener("click", finishClaimRest);
     els.kittyReveal.addEventListener("click", incorporateKitty);
@@ -3575,6 +3637,80 @@
 
     function saveSettings() {
       localStorage.setItem("rookPartnershipSettings", JSON.stringify(settings));
+    }
+
+    function newOverallStats() {
+      return {
+        version: OVERALL_STATS_VERSION,
+        hands: 0,
+        bidHands: 0,
+        totalWinningBid: 0,
+        totalBidderPoints: 0,
+        madeBids: 0,
+        setBids: 0,
+        highestSuccessfulBid: 0,
+        mostTrumpHeld: 0,
+        trumpCounts: { red: 0, yellow: 0, green: 0, black: 0, none: 0 }
+      };
+    }
+
+    function loadOverallStats() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(OVERALL_STATS_KEY) || "null");
+        if (!saved || saved.version !== OVERALL_STATS_VERSION) return newOverallStats();
+        const clean = newOverallStats();
+        clean.hands = Math.max(0, Number(saved.hands) || 0);
+        clean.bidHands = Math.max(0, Number(saved.bidHands) || 0);
+        clean.totalWinningBid = Math.max(0, Number(saved.totalWinningBid) || 0);
+        clean.totalBidderPoints = Math.max(0, Number(saved.totalBidderPoints) || 0);
+        clean.madeBids = Math.max(0, Number(saved.madeBids) || 0);
+        clean.setBids = Math.max(0, Number(saved.setBids) || 0);
+        clean.highestSuccessfulBid = Math.max(0, Number(saved.highestSuccessfulBid) || 0);
+        clean.mostTrumpHeld = Math.max(0, Number(saved.mostTrumpHeld) || 0);
+        for (const suit of [...SUITS, "none"]) {
+          clean.trumpCounts[suit] = Math.max(0, Number(saved.trumpCounts?.[suit]) || 0);
+        }
+        return clean;
+      } catch (error) {
+        return newOverallStats();
+      }
+    }
+
+    function saveOverallStats() {
+      try {
+        localStorage.setItem(OVERALL_STATS_KEY, JSON.stringify(overallStats));
+      } catch (error) {
+        // Overall stats are optional if browser storage is unavailable.
+      }
+    }
+
+    function resetOverallStats() {
+      overallStats = newOverallStats();
+      saveOverallStats();
+    }
+
+    function recordOverallHand(entry) {
+      if (!entry || !Array.isArray(entry.points)) return;
+      overallStats.hands += 1;
+      if (SUITS.includes(entry.trump) || entry.trump === "none") {
+        overallStats.trumpCounts[entry.trump] += 1;
+      }
+      if (Number.isFinite(Number(entry.bid)) && Number(entry.bid) > 0) {
+        overallStats.bidHands += 1;
+        overallStats.totalWinningBid += Number(entry.bid);
+      }
+      const bidderPoints = Number(entry.points[entry.bidTeam] || 0);
+      overallStats.totalBidderPoints += bidderPoints;
+      if (entry.madeBid) {
+        overallStats.madeBids += 1;
+        overallStats.highestSuccessfulBid = Math.max(overallStats.highestSuccessfulBid, Number(entry.bid) || 0);
+      } else {
+        overallStats.setBids += 1;
+      }
+      if (entry.trumpHandRecord && Number.isFinite(Number(entry.trumpHandRecord.count))) {
+        overallStats.mostTrumpHeld = Math.max(overallStats.mostTrumpHeld, Number(entry.trumpHandRecord.count));
+      }
+      saveOverallStats();
     }
 
 
@@ -3913,6 +4049,7 @@
         const savedState = {
           ...state,
           selectedDiscards: [...state.selectedDiscards],
+          bidderVoidSuits: [...state.bidderVoidSuits],
           animatingPlay: false,
           dealAnimating: false
         };
@@ -3943,6 +4080,7 @@
         settings.playerCount = restored.hands.length;
         Object.assign(state, restored, {
           selectedDiscards: new Set(restored.selectedDiscards || []),
+          bidderVoidSuits: new Set(restored.bidderVoidSuits || []),
           animatingPlay: false,
           dealAnimating: false
         });
@@ -3991,8 +4129,8 @@
         state.shootMoon = false;
         state.passed = playerIndexes().map(() => false);
         state.lastBidByPlayer = playerIndexes().map(() => null);
-        state.currentBidder = 0;
-        state.auctionStarted = false;
+        state.currentBidder = settings.biddingEnabled ? (state.dealer + 1) % playerCount() : 0;
+        state.auctionStarted = settings.biddingEnabled;
         state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, 100);
         continueBidding();
       } else if (state.phase === "chooseTrump") {
@@ -4280,6 +4418,7 @@
       state.dealRotation = 0;
       state.cardsPlayed = 0;
       state.trumpHandRecord = null;
+      state.bidderVoidSuits = new Set();
       state.animatingPlay = false;
       state.dealAnimating = true;
 
@@ -4367,7 +4506,9 @@
         clearDealAnimation();
         state.dealAnimating = false;
         state.phase = "bidding";
-        logMessage(`${playerName(state.dealer)} deals. Review or rotate the hands, then make your opening bid.`);
+        state.currentBidder = settings.biddingEnabled ? (state.dealer + 1) % playerCount() : 0;
+        state.auctionStarted = settings.biddingEnabled;
+        logMessage(`${playerName(state.dealer)} deals. ${settings.biddingEnabled ? `${playerName(state.currentBidder)} bids first.` : "Choose the hand and bid you want."}`);
         renderAll();
         continueBidding();
       }, total);
@@ -4414,11 +4555,9 @@
       }
 
       if (!state.auctionStarted) {
-        state.currentBidder = 0;
+        state.auctionStarted = true;
+        state.currentBidder = (state.dealer + 1) % playerCount();
         state.bidCandidate = normalizeBidValue(state.bidCandidate || settings.bidStart, settings.bidStart);
-        setPrompt("Your opening bid", "Rotate hands if desired, then choose your opening bid.");
-        renderAll();
-        return;
       }
 
       const active = playerIndexes().filter(player => !state.passed[player]);
@@ -4653,114 +4792,142 @@
     }
 
     function estimateMaxBid(hand, randomize = true) {
-      const strength = analyzeBotBidHand(hand);
       const profile = aiProfile();
-      const trumpSuit = strength.bestTrump;
-      const trumpCount = strength.potentialTrumpCount;
+      const hasRook = hand.some(card => card.rook);
       const handPoints = hand.reduce((sum, card) => sum + cardPoints(card), 0);
+      const suitCards = Object.fromEntries(SUITS.map(suit => [
+        suit,
+        hand.filter(card => !card.rook && card.suit === suit)
+      ]));
 
-      const topRunForSuit = suit => {
-        const order = suit === trumpSuit
-          ? (settings.rookRank === "high"
-            ? ["rook", 1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
-            : settings.rookRank === "low"
-              ? [1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, "rook"]
-              : [1, 14, 13, 12, 11, "rook", 10, 9, 8, 7, 6, 5])
-          : [1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5];
-        let run = 0;
-        for (const rank of order) {
-          const held = rank === "rook"
-            ? hand.some(card => card.rook)
-            : hand.some(card => !card.rook && card.suit === suit && card.value === rank);
-          if (!held) break;
-          run += 1;
-        }
-        return run;
+      const highWeight = value => {
+        if (value === 1) return 8;
+        if (value === 14) return 6;
+        if (value === 13) return 3;
+        if (value === 12) return 2;
+        if (value === 11 || value === 10) return 1;
+        return 0;
       };
 
-      const trumpTopRun = topRunForSuit(trumpSuit);
-      const highTrumpSupport = hand.filter(card =>
-        !card.rook
-        && card.suit === trumpSuit
-        && (card.value === 1 || card.value >= 12)
-      ).length;
-      const sideRuns = SUITS
-        .filter(suit => suit !== trumpSuit)
-        .map(suit => topRunForSuit(suit));
-      const secondaryControl = sideRuns.reduce((sum, run) => sum + Math.min(2, run), 0);
-      const secondaryAces = hand.filter(card =>
+      const suitBidScore = suit => {
+        const cards = suitCards[suit];
+        const effectiveLength = cards.length + (hasRook ? 1 : 0);
+        const highControl = cards.reduce((sum, card) => sum + highWeight(card.value), 0);
+        return effectiveLength * 7 + highControl;
+      };
+
+      const rankedSuits = [...SUITS].sort((a, b) => suitBidScore(b) - suitBidScore(a));
+      const trumpSuit = rankedSuits[0];
+      const trumpCards = suitCards[trumpSuit];
+      const trumpCount = trumpCards.length + (hasRook ? 1 : 0);
+      const trumpHasOne = trumpCards.some(card => card.value === 1);
+      const trumpHasFourteen = trumpCards.some(card => card.value === 14);
+      const totalOnes = hand.filter(card => !card.rook && card.value === 1).length;
+      const totalTopCards = hand.filter(card => !card.rook && (card.value === 1 || card.value === 14)).length;
+      const secondaryOnes = hand.filter(card =>
         !card.rook && card.suit !== trumpSuit && card.value === 1
       ).length;
+      const secondaryFourteens = hand.filter(card =>
+        !card.rook && card.suit !== trumpSuit && card.value === 14
+      ).length;
+      const activeColors = SUITS.filter(suit => suitCards[suit].length > 0).length;
+      const voids = 4 - activeColors;
 
-      // Estimate unknown kitty help from the cards that are still unseen. This
-      // does not peek at the actual kitty.
-      const unknownCards = Math.max(1, 45 - hand.length);
-      const possibleTrumpCards = 12; // 11 color cards plus the Rook.
-      const expectedKittyTrump = discardCount()
-        * Math.max(0, possibleTrumpCards - trumpCount)
-        / unknownCards;
-      const expectedKittyCounters = discardCount()
-        * Math.max(0, 180 - handPoints)
-        / unknownCards;
+      // Reference model taught from the ten sample hands. An ordinary weak hand
+      // sits near 150. Trump length, 1s/14s, Rook support, voids and useful
+      // secondary colors move the bid upward in small steps.
+      let referenceStrength = 0;
+      if (trumpCount >= 4) referenceStrength += 5;
+      if (trumpCount >= 5) referenceStrength += 5;
+      if (trumpCount >= 6) referenceStrength += 5;
+      if (trumpCount >= 7) referenceStrength += 5;
 
-      // Estimate normal partner help without inspecting a particular partner's
-      // cards. Individual/no-partner games receive no partner allowance.
-      const partnerEstimate = usesFixedTeamScoring()
-        ? 28
-        : settings.callPartner
-          ? 22
-          : 0;
+      if (trumpHasOne) referenceStrength += 6;
+      else if (trumpCount >= 6) referenceStrength -= 5;
+      else referenceStrength -= 3;
 
-      const base = 72;
-      const colorDepth = Math.max(0, trumpCount - 3) * 5.5;
-      const trumpControl = trumpTopRun * 9;
-      const sideControl = secondaryControl * 4.5 + secondaryAces * 3;
-      const counterValue = handPoints * .18;
-      const kittyPotential = expectedKittyTrump * 3 + expectedKittyCounters * .18;
+      if (trumpHasFourteen) referenceStrength += 4;
+      if (trumpCards.some(card => card.value === 13)) referenceStrength += 2;
+      if (hasRook) referenceStrength += 6;
 
-      // The Rook is a 20-point counter as well as a trump card. Give it a
-      // modest extra bidding value only when the hand can support it with
-      // trump length, high trump, or a strong collection of counters.
-      let rookSupportBonus = 0;
-      if (strength.hasRook) {
-        rookSupportBonus += 5;
-        if (trumpCount >= 5) rookSupportBonus += 5;
-        if (highTrumpSupport >= 2 || trumpTopRun >= 2) rookSupportBonus += 5;
-        if (handPoints >= 45) rookSupportBonus += 5;
-        rookSupportBonus = Math.min(15, rookSupportBonus);
+      referenceStrength += secondaryOnes * 5;
+      referenceStrength += secondaryFourteens * 2;
+
+      // A controlled second color is especially useful after trump is pulled.
+      for (const suit of SUITS) {
+        if (suit === trumpSuit) continue;
+        const values = suitCards[suit].map(card => card.value);
+        if (values.includes(1) && values.includes(14)) referenceStrength += 5;
       }
 
-      // Once the five-hand study is complete, use its conservative median
-      // correction to tune future bid estimates without allowing a large jump.
-      const studyAdjustment = bidStudyModelAdjustment();
-      const jitter = randomize
-        ? Math.floor(Math.random() * profile.jitter) - Math.floor(profile.jitter * .65)
-        : 0;
-      let estimate = base
-        + partnerEstimate
-        + colorDepth
-        + trumpControl
-        + sideControl
-        + counterValue
-        + kittyPotential
-        + rookSupportBonus
-        + studyAdjustment
-        + jitter;
+      referenceStrength += voids * 3;
+      if (activeColors <= 2) referenceStrength += 3;
+      if (activeColors === 4) referenceStrength -= 3;
 
-      // Do not let bots push past 160 unless the hand has both real trump
-      // length and several top cards. A 200 bid still requires every card in
-      // the dealt hand to be covered as a likely winner.
-      let ceiling = 160;
-      if (trumpCount >= 6 && strength.aces >= 2 && trumpTopRun >= 2) {
-        ceiling = 180;
-      }
-      if (trumpCount >= 7 && strength.aces >= 2 && trumpTopRun >= 4 && secondaryControl >= 2) {
-        ceiling = 195;
-      }
-      if (strength.fullCoverage) ceiling = 200;
+      if (handPoints >= 45) referenceStrength += 2;
+      if (handPoints >= 60) referenceStrength += 2;
 
-      estimate = Math.floor(estimate / 5) * 5;
-      return clamp(estimate, 95, ceiling);
+      // If two colors are both plausible trump choices, give a small amount of
+      // flexibility value. The kitty can make either direction better, but the
+      // bots do not assume a favorable kitty.
+      const secondSuit = rankedSuits[1];
+      if (suitCards[secondSuit].length >= 4) referenceStrength += 3;
+
+      let estimate = 145 + referenceStrength * .65;
+      estimate = Math.round(estimate / 5) * 5;
+      estimate = Math.max(150, estimate);
+      if (totalTopCards >= 3 && estimate < 160) estimate = 160;
+
+      // Three-player reference bids topped out around 170 even for the best
+      // sample hands. A truly exceptional near-control hand may stretch to 175.
+      if (playerCount() === 3) {
+        const exceptionalThreeHand = trumpCount >= 8 && (trumpHasOne || hasRook) && totalOnes >= 2;
+        estimate = Math.min(estimate, exceptionalThreeHand ? 175 : 170);
+      }
+
+      // In four-player Call Partner, the taught bids were generally higher.
+      // Calling a missing top trump is particularly valuable, while a hand that
+      // already owns both 1 and 14 needs less of a partner premium.
+      if (playerCount() === 4 && estimate > 150) {
+        estimate = Math.min(estimate, 170);
+        let partnerPremium = 0;
+        if (settings.callPartner) {
+          if (!trumpHasOne && trumpCount >= 5) partnerPremium = 15;
+          else if (!trumpHasOne || !trumpHasFourteen) partnerPremium = 10;
+          else partnerPremium = 5;
+        } else if (usesFixedTeamScoring()) {
+          partnerPremium = 5;
+        }
+        estimate += partnerPremium;
+        estimate = Math.min(estimate, 180);
+      }
+
+      // Five-player bidding has less direct training data. Keep it close to the
+      // four-player model rather than inventing a large extra premium.
+      if (playerCount() === 5 && estimate > 150) {
+        estimate += settings.callPartner ? 5 : 0;
+        estimate = Math.min(estimate, 180);
+      }
+
+      const strength = analyzeBotBidHand(hand);
+      if (strength.fullCoverage) estimate = 200;
+
+      // Bidding is intentionally not exact. The unknown kitty can make or break
+      // a hand, so normal bots sometimes shade one five-point step either way.
+      if (randomize && estimate < 200) {
+        const jitterChance = settings.aiDifficulty === "hard" ? .45 : settings.aiDifficulty === "easy" ? .25 : .35;
+        if (Math.random() < jitterChance) {
+          estimate += Math.random() < .5 ? -5 : 5;
+        }
+      }
+
+      // Retain only a small correction from the optional in-game study so it
+      // cannot overpower the manually taught bidding ranges above.
+      estimate += clamp(bidStudyModelAdjustment(), -5, 5);
+      estimate = Math.round(estimate / 5) * 5;
+
+      const learnedCeiling = strength.fullCoverage ? 200 : playerCount() === 3 ? 175 : 180;
+      return clamp(estimate, 145, learnedCeiling);
     }
 
     function finishBidding() {
@@ -4942,6 +5109,24 @@
         easing: "cubic-bezier(.2,.72,.2,1)",
         fill: "forwards"
       }).finished.catch(() => undefined).finally(() => flying.remove());
+    }
+
+    function selectDiscardColor(card) {
+      if (state.phase !== "discard" || state.animatingPlay || !card) return;
+      const suit = effectiveSuit(card);
+      if (!suit) return;
+      const sameColor = state.hands[0].filter(candidate =>
+        effectiveSuit(candidate) === suit && !state.selectedDiscards.has(candidate.id)
+      );
+      if (!sameColor.length) return;
+      const available = discardCount() - state.selectedDiscards.size;
+      if (sameColor.length > available) {
+        showToast(`${sameColor.length} ${SUIT_LABELS[suit] || suit} cards, but only ${available} kitty spot${available === 1 ? "" : "s"} remain`);
+        return;
+      }
+      sameColor.forEach(candidate => state.selectedDiscards.add(candidate.id));
+      playSound("card");
+      renderAll();
     }
 
     function confirmDiscards() {
@@ -5249,7 +5434,12 @@
       }
       const index = state.hands[player].findIndex(card => card.id === cardId);
       if (index < 0) return;
-      const [card] = state.hands[player].splice(index, 1);
+      const card = state.hands[player][index];
+      if (state.trick.length && player === state.highBidder) {
+        const leadSuit = effectiveSuit(state.trick[0].card);
+        if (effectiveSuit(card) !== leadSuit) state.bidderVoidSuits.add(leadSuit);
+      }
+      state.hands[player].splice(index, 1);
       if (settings.callPartner && state.calledCard && card.id === state.calledCard.id) {
         state.calledPartnerRevealed = true;
         state.calledCardLeadBack = false;
@@ -5423,7 +5613,7 @@
       const leadSuit = effectiveSuit(state.trick[0].card);
       const winningPlay = state.trick.find(play => play.player === trickWinner(state.trick));
       const winners = legal.filter(card => beats(card, winningPlay.card, leadSuit));
-      return winners.length ? lowestWinningCard(winners) : lowestSafeDiscard(legal);
+      return winners.length ? lowestWinningCard(winners) : lowestSafeDiscard(legal, player);
     }
 
     function chooseMoonPartnerCard(player, legal) {
@@ -5447,7 +5637,7 @@
         }
       }
 
-      return losingCards.length ? lowestSafeDiscard(losingCards) : lowestWinningCard(legal);
+      return losingCards.length ? lowestSafeDiscard(losingCards, player) : lowestWinningCard(legal);
     }
 
     function chooseBotCard(player, legal) {
@@ -5478,7 +5668,7 @@
       }
 
       const currentWinner = trickWinner(state.trick);
-      const partnerWinning = teamOf(currentWinner) === teamOf(player);
+      const sameSideWinning = teamOf(currentWinner) === teamOf(player);
       const leadSuit = effectiveSuit(state.trick[0].card);
       const winningPlay = state.trick.find(play => play.player === currentWinner);
       const partnerPool = isPartner ? partnerCardPool(protectedLegal) : protectedLegal;
@@ -5487,20 +5677,26 @@
       const forcedTrump = choosePartnerTrumpTakeover(player, partnerPool, currentWinner, winningPlay.card, leadSuit);
       if (forcedTrump) return forcedTrump;
 
-      if (partnerWinning) {
+      // When the bidder keeps pulling trump after a defender is void, discard
+      // from one or two weak colors while protecting the defender's best color.
+      const trumpPullDiscard = chooseTrumpPullDiscard(player, partnerPool);
+      if (trumpPullDiscard) return trumpPullDiscard;
+
+      if (sameSideWinning) {
         const secure = partnerWinLooksSecure(player, winningPlay.card, leadSuit);
         if (secure) {
-          const ordinaryCounters = partnerPool.filter(card => card.rook || card.value === 5 || card.value === 10);
-          if (ordinaryCounters.length) {
-            return [...ordinaryCounters].sort((a, b) => cardPoints(b) - cardPoints(a) || cardRank(a) - cardRank(b))[0];
-          }
+          // Feed useful counters to a teammate who is sure to take the trick.
+          // Never throw a 14 merely for points; keep it unless it is forced.
+          const pointThrows = partnerPool.filter(card =>
+            cardPoints(card) > 0
+            && !(!card.rook && card.value === 14)
+          );
+          if (pointThrows.length) return bestPointThrow(pointThrows);
 
-          const highCounters = partnerPool.filter(card => !card.rook && (card.value === 1 || card.value === 14));
-          const settingCard = highCounters.find(card => wouldSetBiddingTeam(player, card));
-          if (settingCard) return settingCard;
+          if (partnerPool.length === 1) return partnerPool[0];
         }
 
-        return lowestSafeDiscard(partnerPool);
+        return lowestSafeDiscard(partnerPool, player);
       }
 
       if (isPartner && winningCards.length) {
@@ -5516,7 +5712,7 @@
         if (riskyWithoutTen.length) return lowestWinningCard(riskyWithoutTen);
 
         const nonTenDiscard = partnerPool.filter(card => !isTenCounter(card));
-        if (nonTenDiscard.length) return lowestSafeDiscard(nonTenDiscard);
+        if (nonTenDiscard.length) return lowestSafeDiscard(nonTenDiscard, player);
       }
 
       if (winningCards.length) {
@@ -5530,7 +5726,85 @@
         if (pressureWinners.length) return lowestWinningCard(pressureWinners);
       }
 
-      return lowestSafeDiscard(partnerPool);
+      return lowestSafeDiscard(partnerPool, player);
+    }
+
+    function bestPointThrow(cards) {
+      const priority = card => {
+        if (card.rook) return 5;
+        if (card.value === 10) return 4;
+        if (card.value === 5) return 3;
+        if (card.value === 1) return 2;
+        return 1;
+      };
+      return [...cards].sort((a, b) =>
+        priority(b) - priority(a)
+        || cardPoints(b) - cardPoints(a)
+        || cardRank(a) - cardRank(b)
+      )[0];
+    }
+
+    function bidderIsKnownVoidIn(suit) {
+      return Boolean(suit) && state.bidderVoidSuits instanceof Set && state.bidderVoidSuits.has(suit);
+    }
+
+    function defenderAgainstBidder(player) {
+      return state.bidTeam !== null && teamOf(player) !== state.bidTeam;
+    }
+
+    function wouldStrandFourteen(player, card) {
+      if (card.rook || !card.suit || card.value === 14) return false;
+      if (cardHasBeenPlayed(card.suit, 1)) return false;
+      const remaining = state.hands[player].filter(other =>
+        other.id !== card.id && !other.rook && other.suit === card.suit
+      );
+      return remaining.length === 1 && remaining[0].value === 14;
+    }
+
+    function sideSuitKeepScore(player, suit) {
+      const cards = state.hands[player].filter(card => !card.rook && card.suit === suit);
+      if (!cards.length) return -999;
+      let score = cards.length * 2;
+      if (cards.some(card => card.value === 1)) score += 55;
+      if (cards.some(card => card.value === 14)) score += cardHasBeenPlayed(suit, 1) ? 26 : 13;
+      if (cards.some(card => card.value === 13)) score += 11;
+      if (cards.some(card => card.value === 12)) score += 7;
+      score += cards.reduce((sum, card) => sum + cardPoints(card) * .18, 0);
+      return score;
+    }
+
+    function chooseTrumpPullDiscard(player, legal) {
+      if (!state.trick.length
+          || !state.trump
+          || state.trump === "none"
+          || state.trick[0].player !== state.highBidder
+          || effectiveSuit(state.trick[0].card) !== state.trump
+          || !defenderAgainstBidder(player)) return null;
+
+      // If trump is legal, the player still has trump and must follow it.
+      if (legal.some(card => effectiveSuit(card) === state.trump)) return null;
+
+      const sideCards = legal.filter(card => effectiveSuit(card) !== state.trump);
+      if (!sideCards.length) return null;
+      const suits = [...new Set(sideCards.map(card => effectiveSuit(card)))];
+      if (!suits.length) return null;
+
+      const ranked = [...suits].sort((a, b) => sideSuitKeepScore(player, a) - sideSuitKeepScore(player, b));
+      const keepSuit = ranked[ranked.length - 1];
+      let sacrificeSuits = ranked.filter(suit => suit !== keepSuit).slice(0, 2);
+      if (!sacrificeSuits.length) sacrificeSuits = ranked.slice(0, 1);
+
+      let candidates = sideCards.filter(card => sacrificeSuits.includes(effectiveSuit(card)));
+      if (!candidates.length) candidates = sideCards.filter(card => effectiveSuit(card) !== keepSuit);
+      if (!candidates.length) candidates = sideCards;
+
+      const withoutStranding14 = candidates.filter(card => !wouldStrandFourteen(player, card));
+      if (withoutStranding14.length) candidates = withoutStranding14;
+
+      // Preserve likely side-suit winners whenever there is a lesser discard.
+      const nonWinners = candidates.filter(card => !card.rook && card.value !== 1 && card.value !== 14 && card.value < 13);
+      if (nonWinners.length) candidates = nonWinners;
+      return lowestSafeDiscard(candidates, player);
     }
 
     function chooseCalledPartnerCard(player, legal) {
@@ -5673,10 +5947,15 @@
       })[0];
     }
 
-    function lowestSafeDiscard(cards) {
-      return [...cards].sort((a, b) => {
-        const aProtected = !a.rook && a.value === 1 ? 1 : 0;
-        const bProtected = !b.rook && b.value === 1 ? 1 : 0;
+    function lowestSafeDiscard(cards, player = null) {
+      let pool = [...cards];
+      if (player !== null) {
+        const withoutStranding14 = pool.filter(card => !wouldStrandFourteen(player, card));
+        if (withoutStranding14.length) pool = withoutStranding14;
+      }
+      return pool.sort((a, b) => {
+        const aProtected = !a.rook && (a.value === 1 || a.value === 14) ? 1 : 0;
+        const bProtected = !b.rook && (b.value === 1 || b.value === 14) ? 1 : 0;
         if (aProtected !== bProtected) return aProtected - bProtected;
         const pointsDiff = cardPoints(a) - cardPoints(b);
         if (pointsDiff !== 0) return pointsDiff;
@@ -5753,7 +6032,8 @@
     }
 
     function chooseLeadCard(player, legal) {
-      const avoidTrumpLead = calledPartnerShouldAvoidTrumpLead(player);
+      const isDefender = defenderAgainstBidder(player);
+      const avoidTrumpLead = calledPartnerShouldAvoidTrumpLead(player) || isDefender;
 
       if (settings.callPartner && player === state.calledPartner && state.calledCardLeadBack && state.calledCard) {
         const called = legal.find(card => card.id === state.calledCard.id);
@@ -5772,10 +6052,33 @@
         }
       }
 
-      const nonTrumpLeads = avoidTrumpLead
-        ? legal.filter(card => effectiveSuit(card) !== state.trump)
-        : legal;
-      const leadPool = nonTrumpLeads.length ? nonTrumpLeads : legal;
+      let leadPool = [...legal];
+
+      // Defenders do not lead trump back to the bidder when another color is
+      // available. They also avoid colors the bidder has already shown void in.
+      if (avoidTrumpLead && state.trump && state.trump !== "none") {
+        const nonTrump = leadPool.filter(card => effectiveSuit(card) !== state.trump);
+        if (nonTrump.length) leadPool = nonTrump;
+      }
+      if (isDefender) {
+        const nonVoid = leadPool.filter(card => !bidderIsKnownVoidIn(effectiveSuit(card)));
+        if (nonVoid.length) leadPool = nonVoid;
+
+        // Put a 10 or 5 on the table as pressure when possible. It makes the
+        // bidder spend a high card or another trump to collect the counter.
+        const pressureCounters = leadPool.filter(card =>
+          !card.rook
+          && (card.value === 10 || card.value === 5)
+          && !wouldStrandFourteen(player, card)
+        );
+        if (pressureCounters.length) {
+          return [...pressureCounters].sort((a, b) =>
+            Number(b.value === 10) - Number(a.value === 10)
+            || sideSuitKeepScore(player, a.suit) - sideSuitKeepScore(player, b.suit)
+            || cardRank(a) - cardRank(b)
+          )[0];
+        }
+      }
 
       // Cash a card only when no opponent can legally beat it, including a
       // possible trump from a player who is void in the led color.
@@ -5800,12 +6103,13 @@
         }
       }
 
-      // Otherwise lead a low non-counter from the shortest available color to
-      // work toward a void while preserving 1s, 14s, 10s, and the Rook.
+      // Otherwise lead a low non-counter from the shortest available color.
+      // Avoid breaking a suit down to a lone 14 while its 1 is still unseen.
       const nonCounters = leadPool.filter(card =>
         cardPoints(card) === 0
         && !isGuardedFourteen(card)
         && effectiveSuit(card) !== state.trump
+        && !wouldStrandFourteen(player, card)
       );
       const candidates = nonCounters.length ? nonCounters : leadPool;
       const suitLengths = candidates.reduce((counts, card) => {
@@ -5981,6 +6285,7 @@
       };
       state.lastHand = completedHand;
       state.scoreHistory.push(completedHand);
+      recordOverallHand(completedHand);
 
       const gameWinner = determineGameWinner();
       if (gameWinner !== null) {
@@ -6037,6 +6342,7 @@
       };
       state.lastHand = completedHand;
       state.scoreHistory.push(completedHand);
+      recordOverallHand(completedHand);
       const bidStudyCompletedNow = recordBidStudyHand(completedHand, handPoints[state.bidTeam]);
 
       logMessage(`${teamName(nestTeam)} earns the 20-point last trick bonus and the nest.`);
@@ -6209,14 +6515,141 @@
       state.hands = rotated;
       state.hands.forEach(sortHand);
       state.dealRotation = (state.dealRotation + 1) % count;
+
+      // If bots have already spoken, rotating invalidates those bids because
+      // they were made on different hands. Restart the auction automatically
+      // from this hand's rotating first bidder; no extra confirmation click.
+      if (settings.biddingEnabled) {
+        state.highBid = 0;
+        state.highBidder = null;
+        state.bidTeam = null;
+        state.shootMoon = false;
+        state.passed = playerIndexes().map(() => false);
+        state.lastBidByPlayer = playerIndexes().map(() => null);
+        state.currentBidder = (state.dealer + 1) % playerCount();
+        state.auctionStarted = true;
+        state.bidCandidate = settings.bidStart;
+      }
+
       logMessage(`All ${count} dealt hands rotate clockwise. You now hold a different hand.`);
       playSound("card");
+      clearTimeout(botTimer);
+      botTimer = null;
       renderAll();
-      if (state.currentBidder === 0) renderControls();
+      if (settings.biddingEnabled) continueBidding();
+      else if (state.currentBidder === 0) renderControls();
     }
 
     function canRotateHands() {
-      return state.phase === "bidding" && !state.auctionStarted && state.highBidder === null && state.cardsPlayed === 0 && !state.animatingPlay && !state.dealAnimating;
+      return state.phase === "bidding"
+        && state.cardsPlayed === 0
+        && (!settings.biddingEnabled || state.lastBidByPlayer[0] === null)
+        && !state.animatingPlay
+        && !state.dealAnimating;
+    }
+
+    function summarizeHandStats(hands) {
+      const valid = (Array.isArray(hands) ? hands : []).filter(entry => entry && Array.isArray(entry.points));
+      const trumpCounts = { red: 0, yellow: 0, green: 0, black: 0, none: 0 };
+      let totalBid = 0;
+      let bidHands = 0;
+      let bidderPoints = 0;
+      let made = 0;
+      let set = 0;
+      let highestMade = 0;
+      let mostTrump = 0;
+      valid.forEach(entry => {
+        if (SUITS.includes(entry.trump) || entry.trump === "none") trumpCounts[entry.trump] += 1;
+        if (Number.isFinite(Number(entry.bid)) && Number(entry.bid) > 0) {
+          totalBid += Number(entry.bid);
+          bidHands += 1;
+        }
+        bidderPoints += Number(entry.points[entry.bidTeam] || 0);
+        if (entry.madeBid) {
+          made += 1;
+          highestMade = Math.max(highestMade, Number(entry.bid) || 0);
+        } else {
+          set += 1;
+        }
+        if (entry.trumpHandRecord) mostTrump = Math.max(mostTrump, Number(entry.trumpHandRecord.count) || 0);
+      });
+      return {
+        hands: valid.length,
+        averageBid: bidHands ? totalBid / bidHands : 0,
+        averageBidderPoints: valid.length ? bidderPoints / valid.length : 0,
+        made,
+        set,
+        highestMade,
+        mostTrump,
+        trumpCounts
+      };
+    }
+
+    function summarizeOverallStats() {
+      return {
+        hands: overallStats.hands,
+        averageBid: overallStats.bidHands ? overallStats.totalWinningBid / overallStats.bidHands : 0,
+        averageBidderPoints: overallStats.hands ? overallStats.totalBidderPoints / overallStats.hands : 0,
+        made: overallStats.madeBids,
+        set: overallStats.setBids,
+        highestMade: overallStats.highestSuccessfulBid,
+        mostTrump: overallStats.mostTrumpHeld,
+        trumpCounts: { ...overallStats.trumpCounts }
+      };
+    }
+
+    function statsCardHtml(title, stats) {
+      const attempts = stats.made + stats.set;
+      const successRate = attempts ? Math.round(stats.made / attempts * 100) : 0;
+      const counts = stats.trumpCounts || {};
+      return `
+        <section class="stats-card">
+          <h3>${escapeHtml(title)}</h3>
+          <div class="stats-list">
+            <span>Hands</span><strong>${stats.hands}</strong>
+            <span>Average winning bid</span><strong>${stats.hands ? formatAverage(stats.averageBid) : "—"}</strong>
+            <span>Average bidder points</span><strong>${stats.hands ? formatAverage(stats.averageBidderPoints) : "—"}</strong>
+            <span>Made / Set</span><strong>${stats.made} / ${stats.set}</strong>
+            <span>Bid success</span><strong>${attempts ? `${successRate}%` : "—"}</strong>
+            <span>Highest made bid</span><strong>${stats.highestMade || "—"}</strong>
+            <span>Most trump held</span><strong>${stats.mostTrump || "—"}</strong>
+            <div class="stats-trump-line">Trump: Red ${counts.red || 0} • Yellow ${counts.yellow || 0} • Green ${counts.green || 0} • Black ${counts.black || 0}${settings.allowNoTrump ? ` • No Trump ${counts.none || 0}` : ""}</div>
+          </div>
+        </section>
+      `;
+    }
+
+    function openStats() {
+      els.modalBackdrop.dataset.locked = "false";
+      els.modal.className = "modal stats-modal";
+      const gameStats = summarizeHandStats(state.scoreHistory);
+      const lifetimeStats = summarizeOverallStats();
+      els.modal.innerHTML = `
+        <h2>Statistics</h2>
+        <div class="stats-columns">
+          ${statsCardHtml("This Game", gameStats)}
+          ${statsCardHtml("Overall", lifetimeStats)}
+        </div>
+        <div class="modal-actions">
+          <button class="btn danger" id="resetOverallStatsButton">Reset Overall</button>
+          <button class="btn primary" id="closeStatsButton">Close</button>
+        </div>
+      `;
+      document.getElementById("closeStatsButton").addEventListener("click", closeModal);
+      document.getElementById("resetOverallStatsButton").addEventListener("click", () => {
+        openConfirmModal(
+          "Reset overall stats?",
+          "This clears the lifetime hand, trump, bid, and points statistics.",
+          "Reset Stats",
+          () => {
+            resetOverallStats();
+            openStats();
+            showToast("Overall stats reset");
+          }
+        );
+      });
+      els.modalBackdrop.classList.add("open");
+      renderStatsTicker();
     }
 
     function openSettings() {
@@ -6703,7 +7136,7 @@
         playerEl.hidden = !activePlayer;
         if (!activePlayer) continue;
 
-        playerEl.classList.toggle("active", state.phase === "bidding" ? i === 0 : state.phase === "playing" && state.turn === i);
+        playerEl.classList.toggle("active", state.phase === "bidding" ? i === state.currentBidder : state.phase === "playing" && state.turn === i);
         playerEl.classList.toggle("bid-winner", state.highBidder === i && ["pickup","kittyReveal","discard","chooseTrump","callPartner","playing","scoring"].includes(state.phase));
         playerEl.classList.toggle("bidder-marker", settings.callPartner && state.highBidder === i && state.highBid > 0);
         playerEl.classList.toggle("called-partner-marker", settings.callPartner && state.calledPartnerRevealed && state.calledPartner === i);
@@ -6897,7 +7330,35 @@
         if (state.phase === "discard") {
           wrapper.classList.add("playable");
           wrapper.classList.toggle("selected", state.selectedDiscards.has(card.id));
-          wrapper.addEventListener("click", () => toggleDiscard(card.id, wrapper));
+          let holdTimer = null;
+          let heldForColor = false;
+          const clearHold = () => {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+            wrapper.classList.remove("discard-hold");
+          };
+          wrapper.addEventListener("pointerdown", event => {
+            if (event.button !== undefined && event.button !== 0) return;
+            heldForColor = false;
+            try { wrapper.setPointerCapture(event.pointerId); } catch (error) { /* Optional browser feature. */ }
+            wrapper.classList.add("discard-hold");
+            holdTimer = setTimeout(() => {
+              heldForColor = true;
+              clearHold();
+              selectDiscardColor(card);
+            }, 560);
+          });
+          wrapper.addEventListener("pointerup", clearHold);
+          wrapper.addEventListener("pointercancel", clearHold);
+          wrapper.addEventListener("contextmenu", event => event.preventDefault());
+          wrapper.addEventListener("click", event => {
+            if (heldForColor) {
+              heldForColor = false;
+              event.preventDefault();
+              return;
+            }
+            toggleDiscard(card.id, wrapper);
+          });
         } else if (state.phase === "playing" && state.turn === 0 && !state.animatingPlay) {
           if (legal.has(card.id)) {
             wrapper.classList.add("playable");
