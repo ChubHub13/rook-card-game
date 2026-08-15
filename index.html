@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.7">v1.1.7</span>
+            <span class="version-badge" title="Version 1.1.12">v1.1.12</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3500,6 +3500,7 @@
       cardsPlayed: 0,
       trumpHandRecord: null,
       bidderVoidSuits: new Set(),
+      bidderShownSuits: new Set(),
       animatingPlay: false,
       dealAnimating: false,
       winner: null
@@ -4050,6 +4051,7 @@
           ...state,
           selectedDiscards: [...state.selectedDiscards],
           bidderVoidSuits: [...state.bidderVoidSuits],
+          bidderShownSuits: [...state.bidderShownSuits],
           animatingPlay: false,
           dealAnimating: false
         };
@@ -4081,6 +4083,7 @@
         Object.assign(state, restored, {
           selectedDiscards: new Set(restored.selectedDiscards || []),
           bidderVoidSuits: new Set(restored.bidderVoidSuits || []),
+          bidderShownSuits: new Set(restored.bidderShownSuits || []),
           animatingPlay: false,
           dealAnimating: false
         });
@@ -4419,6 +4422,7 @@
       state.cardsPlayed = 0;
       state.trumpHandRecord = null;
       state.bidderVoidSuits = new Set();
+      state.bidderShownSuits = new Set();
       state.animatingPlay = false;
       state.dealAnimating = true;
 
@@ -5003,24 +5007,69 @@
       afterDiscardsReady();
     }
 
+    function noTrumpBidProfile(hand) {
+      const standardOrder = [1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5];
+      const suitCards = Object.fromEntries(SUITS.map(suit => [
+        suit,
+        hand.filter(card => !card.rook && card.suit === suit)
+      ]));
+      const activeSuits = SUITS.filter(suit => suitCards[suit].length > 0);
+      const maxSuitLength = Math.max(...SUITS.map(suit => suitCards[suit].length), 0);
+      const finalHandSize = Math.max(1, hand.length - discardCount());
+      let controlledWinners = 0;
+      let controlledSuits = 0;
+
+      for (const suit of SUITS) {
+        const values = new Set(suitCards[suit].map(card => card.value));
+        let run = 0;
+        for (const value of standardOrder) {
+          if (!values.has(value)) break;
+          run += 1;
+        }
+        controlledWinners += run;
+        if (run > 0) controlledSuits += 1;
+      }
+
+      const ones = hand.filter(card => !card.rook && card.value === 1).length;
+      const highCards = hand.filter(card => !card.rook && (card.value === 1 || card.value >= 12)).length;
+      const losersAfterBestDiscards = Math.max(0, finalHandSize - controlledWinners);
+
+      // No Trump is intentionally difficult. Bots only consider it when the hand
+      // is genuinely spread across several colors and can be reduced to mostly
+      // guaranteed winners after the kitty is returned. The Rook is a red 10.5
+      // here, so it does not count as a top-card winner.
+      const eligible = settings.allowNoTrump
+        && activeSuits.length >= 3
+        && controlledSuits >= 2
+        && ones >= 2
+        && highCards >= Math.max(5, Math.ceil(finalHandSize * .55))
+        && controlledWinners >= Math.max(5, finalHandSize - 2)
+        && losersAfterBestDiscards <= 2
+        && maxSuitLength <= Math.ceil(finalHandSize * .6);
+
+      return {
+        eligible,
+        controlledWinners,
+        controlledSuits,
+        ones,
+        highCards,
+        activeSuits: activeSuits.length,
+        losersAfterBestDiscards,
+        finalHandSize
+      };
+    }
+
     function chooseBestTrump(hand) {
       let bestSuit = SUITS[0];
       let bestScore = -Infinity;
-      const choices = settings.allowNoTrump ? [...SUITS, "none"] : [...SUITS];
 
-      for (const suit of choices) {
+      // First choose the strongest actual trump color. No Trump is evaluated
+      // separately with a much stricter gate so bots do not drift into it just
+      // because a hand contains several unrelated high cards.
+      for (const suit of SUITS) {
         let score = 0;
         for (const card of hand) {
-          if (suit === "none") {
-            if (card.rook) score += 8;
-            else {
-              if (card.value === 1) score += 17;
-              else if (card.value === 14) score += 9;
-              else if (card.value === 13) score += 5;
-              else if (card.value === 12) score += 2;
-              score += cardPoints(card) * 0.18;
-            }
-          } else if (card.rook) {
+          if (card.rook) {
             score += settings.rookRank === "high" ? 18 : settings.rookRank === "10.5" ? 10 : 5;
           } else if (card.suit === suit) {
             score += 3;
@@ -5036,6 +5085,20 @@
           bestSuit = suit;
         }
       }
+
+      const noTrump = noTrumpBidProfile(hand);
+      if (noTrump.eligible) {
+        const noTrumpScore = noTrump.controlledWinners * 17
+          + noTrump.ones * 5
+          + noTrump.controlledSuits * 4
+          + noTrump.highCards * 1.5
+          - noTrump.losersAfterBestDiscards * 10;
+
+        // Require a clear advantage over simply naming the strongest suit.
+        // This keeps No Trump as a special choice for unusually broad control.
+        if (noTrumpScore >= bestScore + 15) return "none";
+      }
+
       return bestSuit;
     }
 
@@ -5435,9 +5498,13 @@
       const index = state.hands[player].findIndex(card => card.id === cardId);
       if (index < 0) return;
       const card = state.hands[player][index];
-      if (state.trick.length && player === state.highBidder) {
-        const leadSuit = effectiveSuit(state.trick[0].card);
-        if (effectiveSuit(card) !== leadSuit) state.bidderVoidSuits.add(leadSuit);
+      if (player === state.highBidder) {
+        const playedSuit = effectiveSuit(card);
+        if (playedSuit) state.bidderShownSuits.add(playedSuit);
+        if (state.trick.length) {
+          const leadSuit = effectiveSuit(state.trick[0].card);
+          if (playedSuit !== leadSuit) state.bidderVoidSuits.add(leadSuit);
+        }
       }
       state.hands[player].splice(index, 1);
       if (settings.callPartner && state.calledCard && card.id === state.calledCard.id) {
@@ -5631,9 +5698,14 @@
 
       const losingCards = legal.filter(card => !beats(card, winningPlay.card, leadSuit));
       if (ourTeamWinning && losingCards.length) {
-        const counters = losingCards.filter(card => cardPoints(card) > 0);
-        if (counters.length) {
-          return [...counters].sort((a, b) => cardPoints(b) - cardPoints(a) || cardRank(a) - cardRank(b))[0];
+        // Feed counters only when the teammate's winning card is guaranteed to
+        // survive every opponent who still has to play. This is especially
+        // important for the 20-point Rook.
+        const secure = partnerWinLooksSecure(player, winningPlay.card, leadSuit);
+        if (secure) {
+          const counters = losingCards.filter(card => isThrowablePointCard(card));
+          const pointThrow = bestPointThrow(counters);
+          if (pointThrow) return pointThrow;
         }
       }
 
@@ -5683,20 +5755,34 @@
       if (trumpPullDiscard) return trumpPullDiscard;
 
       if (sameSideWinning) {
+        // Do not overtake or trump a teammate who already owns the trick when
+        // there is any legal card that can be played underneath the winner.
+        const nonOvertakingCards = partnerPool.filter(card => !beats(card, winningPlay.card, leadSuit));
+        const safePool = nonOvertakingCards.length ? nonOvertakingCards : partnerPool;
         const secure = partnerWinLooksSecure(player, winningPlay.card, leadSuit);
         if (secure) {
-          // Feed useful counters to a teammate who is sure to take the trick.
-          // Never throw a 14 merely for points; keep it unless it is forced.
-          const pointThrows = partnerPool.filter(card =>
-            cardPoints(card) > 0
-            && !(!card.rook && card.value === 14)
+          // A 1 is normally a control card, not a point throw. The exception is
+          // a guaranteed teammate trick where sacrificing 15 points either sets
+          // the bidder or moves the defenders within one meaningful counter of it.
+          const setPressureOne = chooseSetPressureOneThrow(
+            player,
+            nonOvertakingCards,
+            winningPlay.card,
+            leadSuit
           );
-          if (pointThrows.length) return bestPointThrow(pointThrows);
+          if (setPressureOne) return setPressureOne;
 
-          if (partnerPool.length === 1) return partnerPool[0];
+          // Feed useful counters only underneath a guaranteed teammate winner.
+          // A 14 remains protected, and the Rook is only fed when the teammate's
+          // win is already secure and the Rook itself does not overtake.
+          const pointThrows = safePool.filter(card => isThrowablePointCard(card));
+          const pointThrow = bestPointThrow(pointThrows);
+          if (pointThrow) return pointThrow;
+
+          if (safePool.length === 1) return safePool[0];
         }
 
-        return lowestSafeDiscard(partnerPool, player);
+        return chooseStrategicSluff(player, safePool, leadSuit);
       }
 
       if (isPartner && winningCards.length) {
@@ -5726,18 +5812,57 @@
         if (pressureWinners.length) return lowestWinningCard(pressureWinners);
       }
 
-      return lowestSafeDiscard(partnerPool, player);
+      return chooseStrategicSluff(player, partnerPool, leadSuit);
+    }
+
+    function chooseSetPressureOneThrow(player, cards, winningCard, leadSuit) {
+      if (!defenderAgainstBidder(player) || state.highBidder === null || !state.highBid) return null;
+
+      const candidates = cards.filter(card =>
+        !card.rook
+        && card.value === 1
+        && (!state.calledCard || card.id !== state.calledCard.id)
+        && !beats(card, winningCard, leadSuit)
+      );
+      if (!candidates.length) return null;
+
+      const defenderTeam = teamOf(player);
+      const capturedPoints = (state.captured[defenderTeam] || [])
+        .reduce((sum, card) => sum + cardPoints(card), 0);
+      const pointsAlreadyInTrick = state.trick
+        .reduce((sum, play) => sum + cardPoints(play.card), 0);
+      const pointsNeededToSet = Math.max(1, 201 - state.highBid);
+
+      const useful = candidates.filter(card => {
+        const afterThisTrick = capturedPoints + pointsAlreadyInTrick + cardPoints(card);
+        // Within 10 points means a single 10-point counter could
+        // finish setting the bidder. That is enough upside to justify cashing a 1.
+        return afterThisTrick >= Math.max(1, pointsNeededToSet - 10);
+      });
+
+      if (!useful.length) return null;
+      return [...useful].sort((a, b) => cardRank(a) - cardRank(b))[0];
+    }
+
+    function isThrowablePointCard(card) {
+      // Point-feeding cards are limited to the Rook, 10s, and 5s.
+      // Never classify a 1 or 14 as a card to throw to a partner.
+      return Boolean(card && (card.rook || card.value === 10 || card.value === 5));
     }
 
     function bestPointThrow(cards) {
+      // Never fall back to a control card here. If there is no legal 5, 10,
+      // or Rook to feed, return null and let the normal discard logic decide.
+      // This prevents a 1 from ever being intentionally thrown as points.
+      const safeCards = cards.filter(card => isThrowablePointCard(card));
+      if (!safeCards.length) return null;
       const priority = card => {
         if (card.rook) return 5;
         if (card.value === 10) return 4;
         if (card.value === 5) return 3;
-        if (card.value === 1) return 2;
         return 1;
       };
-      return [...cards].sort((a, b) =>
+      return [...safeCards].sort((a, b) =>
         priority(b) - priority(a)
         || cardPoints(b) - cardPoints(a)
         || cardRank(a) - cardRank(b)
@@ -5746,6 +5871,12 @@
 
     function bidderIsKnownVoidIn(suit) {
       return Boolean(suit) && state.bidderVoidSuits instanceof Set && state.bidderVoidSuits.has(suit);
+    }
+
+    function bidderHasShownSuit(suit) {
+      return Boolean(suit)
+        && state.bidderShownSuits instanceof Set
+        && state.bidderShownSuits.has(suit);
     }
 
     function defenderAgainstBidder(player) {
@@ -5770,7 +5901,48 @@
       if (cards.some(card => card.value === 13)) score += 11;
       if (cards.some(card => card.value === 12)) score += 7;
       score += cards.reduce((sum, card) => sum + cardPoints(card) * .18, 0);
+
+      // If the bidder has already shown a secondary color, defenders should keep
+      // useful length or high cards in that color and sluff from somewhere else.
+      // That preserves a suit likely to matter when the bidder returns to it.
+      if (
+        defenderAgainstBidder(player)
+        && suit !== state.trump
+        && bidderHasShownSuit(suit)
+        && (cards.length >= 2 || cards.some(card => card.value >= 12 || card.value === 1))
+      ) {
+        score += 80;
+      }
       return score;
+    }
+
+    function chooseStrategicSluff(player, cards, leadSuit = null) {
+      let pool = [...cards];
+      if (!pool.length) return null;
+
+      if (defenderAgainstBidder(player)) {
+        // If the bot is void in the led color, keep trump for taking tricks rather
+        // than casually throwing it away when a side-suit discard is available.
+        if (leadSuit && !pool.some(card => effectiveSuit(card) === leadSuit)) {
+          const nonTrump = pool.filter(card => state.trump === "none" || effectiveSuit(card) !== state.trump);
+          if (nonTrump.length) pool = nonTrump;
+        }
+
+        const suits = [...new Set(pool.map(card => effectiveSuit(card)))];
+        const protectedSuits = suits.filter(suit => {
+          if (!suit || suit === state.trump || !bidderHasShownSuit(suit)) return false;
+          const suitCards = state.hands[player].filter(card => effectiveSuit(card) === suit);
+          return suitCards.length >= 2
+            || suitCards.some(card => !card.rook && (card.value === 1 || card.value >= 12));
+        });
+
+        if (protectedSuits.length) {
+          const alternatives = pool.filter(card => !protectedSuits.includes(effectiveSuit(card)));
+          if (alternatives.length) pool = alternatives;
+        }
+      }
+
+      return lowestSafeDiscard(pool, player);
     }
 
     function chooseTrumpPullDiscard(player, legal) {
@@ -5804,7 +5976,7 @@
       // Preserve likely side-suit winners whenever there is a lesser discard.
       const nonWinners = candidates.filter(card => !card.rook && card.value !== 1 && card.value !== 14 && card.value < 13);
       if (nonWinners.length) candidates = nonWinners;
-      return lowestSafeDiscard(candidates, player);
+      return chooseStrategicSluff(player, candidates, state.trump);
     }
 
     function chooseCalledPartnerCard(player, legal) {
@@ -5884,6 +6056,10 @@
 
     function choosePartnerTrumpTakeover(player, legal, currentWinner, winningCard, leadSuit) {
       if (!isCurrentPartner(player) || state.trump === "none") return null;
+
+      // Never trump a teammate who already owns the trick. A partner should
+      // preserve trump instead of overtaking the bidder or another teammate.
+      if (teamOf(currentWinner) === teamOf(player)) return null;
 
       const userPlayed = state.trick.some(play => play.player === 0);
       if (!userPlayed || currentWinner === 0) return null;
@@ -6031,6 +6207,44 @@
       });
     }
 
+    function chooseNoTrumpEarlyLossLead(player, legal) {
+      if (state.trump !== "none" || teamOf(player) !== state.bidTeam) return null;
+
+      const completedTricks = Math.floor(state.cardsPlayed / Math.max(1, playerCount()));
+      const totalTricks = totalTricksInHand();
+      const earlyWindow = Math.min(2, Math.max(1, Math.floor(totalTricks * .25)));
+      if (completedTricks >= earlyWindow || totalTricks - completedTricks <= 4) return null;
+
+      // Only duck early when the remaining hand is still dominated by control
+      // cards. The purpose is to get unavoidable losers out while there is time
+      // to regain the lead, not to donate late tricks and the last-trick points.
+      const hand = state.hands[player];
+      const sureWinners = hand.filter(card => !opponentCanBeatLead(player, card));
+      if (sureWinners.length < Math.max(3, hand.length - 3)) return null;
+
+      const plannedLosers = legal.filter(card =>
+        !card.rook
+        && card.value !== 1
+        && card.value !== 14
+        && cardPoints(card) === 0
+        && opponentCanBeatLead(player, card)
+        && !wouldStrandFourteen(player, card)
+      );
+      if (!plannedLosers.length) return null;
+
+      // Prefer a low loser from a color where the bidder still owns later
+      // control, making it more likely the hand can steer back to a winner.
+      return [...plannedLosers].sort((a, b) => {
+        const aSuit = effectiveSuit(a);
+        const bSuit = effectiveSuit(b);
+        const aControl = hand.some(card => card.id !== a.id && effectiveSuit(card) === aSuit && !opponentCanBeatLead(player, card));
+        const bControl = hand.some(card => card.id !== b.id && effectiveSuit(card) === bSuit && !opponentCanBeatLead(player, card));
+        return Number(bControl) - Number(aControl)
+          || cardRank(a) - cardRank(b)
+          || sideSuitKeepScore(player, aSuit) - sideSuitKeepScore(player, bSuit);
+      })[0];
+    }
+
     function chooseLeadCard(player, legal) {
       const isDefender = defenderAgainstBidder(player);
       const avoidTrumpLead = calledPartnerShouldAvoidTrumpLead(player) || isDefender;
@@ -6079,6 +6293,13 @@
           )[0];
         }
       }
+
+      // In No Trump, a bidding-side bot with an otherwise controlled hand may
+      // intentionally shed one of its few losers in the opening tricks. Never
+      // do this late, when losing the lead can strand the remaining winners and
+      // give away the final-trick/kitty points.
+      const noTrumpEarlyLoss = chooseNoTrumpEarlyLossLead(player, leadPool);
+      if (noTrumpEarlyLoss) return noTrumpEarlyLoss;
 
       // Cash a card only when no opponent can legally beat it, including a
       // possible trump from a player who is void in the led color.
@@ -7402,6 +7623,15 @@
           waiting.className = "bid-picker direct-bid-picker";
           waiting.innerHTML = `<span class="bid-entry-label">Current bid</span><strong>${state.highBid || "—"}</strong>`;
           els.controls.appendChild(waiting);
+          const actionGroup = document.createElement("div");
+          actionGroup.className = "bid-action-group";
+          const bitterButton = document.createElement("button");
+          bitterButton.className = "btn bitter-bunch";
+          bitterButton.textContent = "Bitter Bunch";
+          bitterButton.title = "Throw in all hands and redeal";
+          bitterButton.addEventListener("click", bitterBunch);
+          actionGroup.appendChild(bitterButton);
+          els.controls.appendChild(actionGroup);
           return;
         }
 
@@ -7436,34 +7666,30 @@
             settings.biddingEnabled ? placeHumanBid() : takeSelectedBid();
           });
           actionGroup.appendChild(bidButton);
-          if (settings.biddingEnabled) {
-            if (state.auctionStarted) {
-              const passButton = document.createElement("button");
-              passButton.className = "btn";
-              passButton.textContent = "Pass";
-              passButton.addEventListener("click", passHumanBid);
-              actionGroup.appendChild(passButton);
-            } else {
-              const bitterButton = document.createElement("button");
-              bitterButton.className = "btn bitter-bunch";
-              bitterButton.textContent = "Bitter Bunch";
-              bitterButton.title = "Throw in all hands and redeal";
-              bitterButton.addEventListener("click", bitterBunch);
-              actionGroup.appendChild(bitterButton);
-            }
-          } else {
-            const bitterButton = document.createElement("button");
-            bitterButton.className = "btn bitter-bunch";
-            bitterButton.textContent = "Bitter Bunch";
-            bitterButton.title = "Throw in all hands and redeal";
-            bitterButton.addEventListener("click", bitterBunch);
-            actionGroup.appendChild(bitterButton);
+          if (settings.biddingEnabled && state.auctionStarted) {
+            const passButton = document.createElement("button");
+            passButton.className = "btn";
+            passButton.textContent = "Pass";
+            passButton.addEventListener("click", passHumanBid);
+            actionGroup.appendChild(passButton);
           }
+
+          // Bitter Bunch is always available during bidding, regardless of
+          // whether bot bidding is enabled or an auction is already underway.
+          const bitterButton = document.createElement("button");
+          bitterButton.className = "btn bitter-bunch";
+          bitterButton.textContent = "Bitter Bunch";
+          bitterButton.title = "Throw in all hands and redeal";
+          bitterButton.addEventListener("click", bitterBunch);
+          actionGroup.appendChild(bitterButton);
           els.controls.appendChild(actionGroup);
           return;
         }
 
-        if (settings.biddingEnabled) addControlButton("Pass", "", passHumanBid);
+        if (settings.biddingEnabled) {
+          addControlButton("Pass", "", passHumanBid);
+          addControlButton("Bitter Bunch", "bitter-bunch", bitterBunch);
+        }
         return;
       }
 
