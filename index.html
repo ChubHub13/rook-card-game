@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.12">v1.1.12</span>
+            <span class="version-badge" title="Version 1.1.13">v1.1.13</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3459,6 +3459,7 @@
     let kittyRevealTimer = null;
     let statsTickerTimer = null;
     let statsTickerIndex = 0;
+    let discardHoldSuppressUntil = 0;
 
     const state = {
       phase: "idle",
@@ -3470,6 +3471,7 @@
       dealer: 3,
       hands: playerIndexes().map(() => []),
       nest: [],
+      kittyPickupSnapshot: [],
       captured: [[], []],
       finalHandPoints: null,
       trick: [],
@@ -4394,6 +4396,7 @@
       state.phase = "dealing";
       state.hands = playerIndexes().map(() => []);
       state.nest = [];
+      state.kittyPickupSnapshot = [];
       state.captured = [[], []];
       state.finalHandPoints = null;
       state.trick = [];
@@ -4945,6 +4948,7 @@
       showToast(`${playerName(state.highBidder)} wins ${winningBidLabel}`);
 
       if (state.highBidder === 0) {
+        state.kittyPickupSnapshot = state.nest.map(card => ({ ...card }));
         state.phase = "kittyReveal";
         setPrompt("Kitty", "Click the kitty to add it to your hand.");
         renderAll();
@@ -5716,6 +5720,12 @@
       const calledPartnerPlay = chooseCalledPartnerCard(player, legal);
       if (calledPartnerPlay) return calledPartnerPlay;
 
+      // When a defender is down to two cards in the bidder-led color and one is
+      // an uncovered 14, cash the 14 now instead of automatically ducking with
+      // the lower card and leaving the 14 stranded for the unseen 1.
+      const exposedFourteen = chooseExposedFourteenCashout(player, legal);
+      if (exposedFourteen) return exposedFourteen;
+
       const calledCardProtected = protectCalledPartnerCard(player, legal);
       const protectedLegal = protectUncoveredFourteens(calledCardProtected);
 
@@ -5748,6 +5758,23 @@
 
       const forcedTrump = choosePartnerTrumpTakeover(player, partnerPool, currentWinner, winningPlay.card, leadSuit);
       if (forcedTrump) return forcedTrump;
+
+      // If a defender is void and a later defender is guaranteed to take the
+      // trick, feed a counter now rather than wasting a neutral discard. This
+      // is safe even though the teammate has not played yet because the later
+      // winner is checked against every remaining response.
+      if (
+        defenderAgainstBidder(player)
+        && teamOf(currentWinner) === state.bidTeam
+        && !state.hands[player].some(card => effectiveSuit(card) === leadSuit)
+        && futureTeammateCanSecureTrick(player, winningPlay.card, leadSuit)
+      ) {
+        const losingPoints = partnerPool.filter(card =>
+          isThrowablePointCard(card) && !beats(card, winningPlay.card, leadSuit)
+        );
+        const pointFeed = bestPointThrow(losingPoints);
+        if (pointFeed) return pointFeed;
+      }
 
       // When the bidder keeps pulling trump after a defender is void, discard
       // from one or two weak colors while protecting the defender's best color.
@@ -5813,6 +5840,40 @@
       }
 
       return chooseStrategicSluff(player, partnerPool, leadSuit);
+    }
+
+    function chooseExposedFourteenCashout(player, legal) {
+      if (!defenderAgainstBidder(player) || !state.trick.length || state.highBidder === null) return null;
+
+      const lead = state.trick[0];
+      if (!lead || lead.player !== state.highBidder) return null;
+      const leadSuit = effectiveSuit(lead.card);
+      if (!leadSuit || cardRank(lead.card) >= 14 || cardHasBeenPlayed(leadSuit, 1)) return null;
+
+      const suitCards = state.hands[player].filter(card => effectiveSuit(card) === leadSuit);
+      if (suitCards.length !== 2) return null;
+      const fourteen = suitCards.find(card => !card.rook && card.value === 14);
+      if (!fourteen || !legal.some(card => card.id === fourteen.id)) return null;
+
+      const currentWinner = trickWinner(state.trick);
+      if (teamOf(currentWinner) === teamOf(player)) return null;
+      const winningPlay = state.trick.find(play => play.player === currentWinner);
+      if (!winningPlay || !beats(fourteen, winningPlay.card, leadSuit)) return null;
+
+      return fourteen;
+    }
+
+    function futureTeammateCanSecureTrick(player, winningCard, leadSuit) {
+      const alreadyPlayed = new Set(state.trick.map(play => play.player));
+      for (let next = (player + 1) % playerCount(); next !== state.leader; next = (next + 1) % playerCount()) {
+        if (next === player || alreadyPlayed.has(next) || teamOf(next) !== teamOf(player)) continue;
+        const hand = state.hands[next];
+        const followers = hand.filter(card => effectiveSuit(card) === leadSuit);
+        const legal = followers.length ? followers : hand;
+        const winners = legal.filter(card => beats(card, winningCard, leadSuit));
+        if (winners.some(card => cardWinLooksSecure(next, card, leadSuit))) return true;
+      }
+      return false;
     }
 
     function chooseSetPressureOneThrow(player, cards, winningCard, leadSuit) {
@@ -5925,7 +5986,13 @@
         // than casually throwing it away when a side-suit discard is available.
         if (leadSuit && !pool.some(card => effectiveSuit(card) === leadSuit)) {
           const nonTrump = pool.filter(card => state.trump === "none" || effectiveSuit(card) !== state.trump);
-          if (nonTrump.length) pool = nonTrump;
+          const expendableNonTrump = nonTrump.filter(card =>
+            card.rook || (!card.rook && card.value !== 1 && card.value !== 14 && card.value !== 13)
+          );
+          // Save trump when there is a genuinely expendable side card. If the
+          // only side card is a high control card, allow a counter/trump such as
+          // the Rook to go first so the high card survives for a later trick.
+          if (expendableNonTrump.length) pool = nonTrump;
         }
 
         const suits = [...new Set(pool.map(card => effectiveSuit(card)))];
@@ -6129,10 +6196,19 @@
         const withoutStranding14 = pool.filter(card => !wouldStrandFourteen(player, card));
         if (withoutStranding14.length) pool = withoutStranding14;
       }
+
+      const keepValue = card => {
+        if (card.rook) return 22;
+        if (card.value === 1) return 100;
+        if (card.value === 14) return 88;
+        if (card.value === 13) return 34;
+        if (card.value === 12) return 18;
+        return 0;
+      };
+
       return pool.sort((a, b) => {
-        const aProtected = !a.rook && (a.value === 1 || a.value === 14) ? 1 : 0;
-        const bProtected = !b.rook && (b.value === 1 || b.value === 14) ? 1 : 0;
-        if (aProtected !== bProtected) return aProtected - bProtected;
+        const keepDiff = keepValue(a) - keepValue(b);
+        if (keepDiff !== 0) return keepDiff;
         const pointsDiff = cardPoints(a) - cardPoints(b);
         if (pointsDiff !== 0) return pointsDiff;
         return cardRank(a) - cardRank(b);
@@ -6245,6 +6321,15 @@
       })[0];
     }
 
+    function bidderSideSuitToAvoidAfterDefenderWin(player) {
+      if (!defenderAgainstBidder(player) || !state.lastTrick || state.lastTrick.winner !== player) return null;
+      const lead = state.lastTrick.plays && state.lastTrick.plays[0];
+      if (!lead || lead.player !== state.highBidder) return null;
+      const suit = effectiveSuit(lead.card);
+      if (!suit || suit === state.trump) return null;
+      return suit;
+    }
+
     function chooseLeadCard(player, legal) {
       const isDefender = defenderAgainstBidder(player);
       const avoidTrumpLead = calledPartnerShouldAvoidTrumpLead(player) || isDefender;
@@ -6277,6 +6362,15 @@
       if (isDefender) {
         const nonVoid = leadPool.filter(card => !bidderIsKnownVoidIn(effectiveSuit(card)));
         if (nonVoid.length) leadPool = nonVoid;
+
+        // If this defender just took a side-suit trick that the bidder led, do
+        // not hand that color back. Make the bidder spend another trump or find
+        // a different route to regain control.
+        const bidderSideSuit = bidderSideSuitToAvoidAfterDefenderWin(player);
+        if (bidderSideSuit) {
+          const otherColors = leadPool.filter(card => effectiveSuit(card) !== bidderSideSuit);
+          if (otherColors.length) leadPool = otherColors;
+        }
 
         // Put a 10 or 5 on the table as pressure when possible. It makes the
         // bidder spend a high card or another trump to collect the counter.
@@ -6470,8 +6564,15 @@
     }
 
     function goDown() {
-      if (state.phase !== "playing" || state.highBidder !== 0) return;
+      const allowedPhases = new Set(["kittyReveal", "chooseTrump", "discard", "callPartner", "playing"]);
+      if (!allowedPhases.has(state.phase) || state.highBidder !== 0) return;
 
+      const revealedKitty = (state.kittyPickupSnapshot && state.kittyPickupSnapshot.length
+        ? state.kittyPickupSnapshot
+        : state.nest
+      ).map(card => ({ ...card }));
+
+      closeTableDialog();
       gameToken += 1;
       clearTimeout(botTimer);
       botTimer = null;
@@ -6517,7 +6618,7 @@
       renderAll();
       saveGameState();
       playSound(gameWinner !== null ? "win" : "set");
-      openScoreModal(handPoints, changes, false, gameWinner, true, null, state.nest.map(card => ({ ...card })));
+      openScoreModal(handPoints, changes, false, gameWinner, true, null, revealedKitty);
     }
 
     function scoreHand(claimHands = null) {
@@ -7240,7 +7341,8 @@
       renderControls();
       renderStatsTicker();
       els.rotateButton.disabled = !canRotateHands();
-      els.goDownButton.hidden = !(state.phase === "playing" && state.highBidder === 0 && state.trick.length < playerCount());
+      const goDownPhases = new Set(["kittyReveal", "chooseTrump", "discard", "callPartner", "playing"]);
+      els.goDownButton.hidden = !(state.highBidder === 0 && goDownPhases.has(state.phase));
       document.querySelector(".table-shell").dataset.playerCount = String(playerCount());
       els.nestLabel.textContent = `${discardCount()}-card nest`;
       saveGameState();
@@ -7565,6 +7667,7 @@
             wrapper.classList.add("discard-hold");
             holdTimer = setTimeout(() => {
               heldForColor = true;
+              discardHoldSuppressUntil = Date.now() + 900;
               clearHold();
               selectDiscardColor(card);
             }, 560);
@@ -7573,9 +7676,10 @@
           wrapper.addEventListener("pointercancel", clearHold);
           wrapper.addEventListener("contextmenu", event => event.preventDefault());
           wrapper.addEventListener("click", event => {
-            if (heldForColor) {
+            if (heldForColor || Date.now() < discardHoldSuppressUntil) {
               heldForColor = false;
               event.preventDefault();
+              event.stopPropagation();
               return;
             }
             toggleDiscard(card.id, wrapper);
