@@ -701,7 +701,7 @@
       margin: 0 !important;
       pointer-events: none !important;
       transform-origin: 50% 50% !important;
-      transition: transform .38s cubic-bezier(.2,.72,.18,1), opacity .14s linear !important;
+      transition: transform .24s cubic-bezier(.2,.72,.18,1), opacity .10s linear !important;
       will-change: transform, opacity;
     }
 
@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.13">v1.1.13</span>
+            <span class="version-badge" title="Version 1.1.14">v1.1.14</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3431,9 +3431,11 @@
     };
 
     const AI_PROFILES = {
-      easy: { bidBonus: -12, humanLeadPenalty: 30, openChance: .28, mistakeChance: .24, jitter: 16 },
-      normal: { bidBonus: 0, humanLeadPenalty: 20, openChance: .55, mistakeChance: .05, jitter: 9 },
-      hard: { bidBonus: 10, humanLeadPenalty: 12, openChance: .78, mistakeChance: 0, jitter: 4 }
+      easy: { bidBonus: -15, humanLeadPenalty: 30, openChance: .25, mistakeChance: .24, jitter: 16 },
+      normal: { bidBonus: -5, humanLeadPenalty: 20, openChance: .50, mistakeChance: .05, jitter: 9 },
+      // Hard should play cards better, not simply bid more aggressively. A 100-hand
+      // calibration run showed the old +10 bonus produced too many set bids.
+      hard: { bidBonus: 0, humanLeadPenalty: 18, openChance: .62, mistakeChance: 0, jitter: 4 }
     };
 
     const BOT_SPEEDS = {
@@ -3441,7 +3443,7 @@
         bid: [900, 1450], prepare: [1050, 1450], play: [850, 1300], trick: [1150, 1450]
       },
       normal: {
-        bid: [480, 900], prepare: [700, 900], play: [420, 900], trick: [760, 900]
+        bid: [430, 760], prepare: [620, 820], play: [330, 690], trick: [650, 820]
       },
       fast: {
         bid: [150, 260], prepare: [220, 340], play: [150, 280], trick: [320, 430]
@@ -4768,13 +4770,50 @@
       return Math.random() < profileChance * userLeadingPenalty ? 400 : 200;
     }
 
+    function simulatedBidRiskAdjustment(hand) {
+      const hasRook = hand.some(card => card.rook);
+      const suitCards = Object.fromEntries(SUITS.map(suit => [
+        suit,
+        hand.filter(card => !card.rook && card.suit === suit)
+      ]));
+      const bestSuit = [...SUITS].sort((a, b) => {
+        const score = suit => suitCards[suit].length * 7
+          + suitCards[suit].reduce((sum, card) => sum + (card.value === 1 ? 8 : card.value === 14 ? 6 : card.value === 13 ? 3 : card.value === 12 ? 2 : card.value === 11 || card.value === 10 ? 1 : 0), 0);
+        return score(b) - score(a);
+      })[0];
+      const trumpCards = suitCards[bestSuit];
+      const trumpCount = trumpCards.length + (hasRook ? 1 : 0);
+      const totalOnes = hand.filter(card => !card.rook && card.value === 1).length;
+      const totalFourteens = hand.filter(card => !card.rook && card.value === 14).length;
+      const trumpHasOne = trumpCards.some(card => card.value === 1);
+      const activeColors = SUITS.filter(suit => suitCards[suit].length).length;
+
+      // The 100-hand calibration showed that length without top control was the
+      // biggest source of optimistic bids. Keep the taught hand ranges, but take
+      // a small safety step off hands that need the kitty to repair too much.
+      let adjustment = playerCount() === 3 ? -5 : 0;
+      if (!hasRook && totalOnes === 0) adjustment -= 10;
+      else if (!hasRook && totalOnes === 1) adjustment -= 5;
+      if (!trumpHasOne && trumpCount < 6) adjustment -= 5;
+      if (trumpCount <= 4) adjustment -= 5;
+      if (activeColors === 4 && totalOnes < 2) adjustment -= 5;
+
+      // Strong control can earn back one safety step, but never creates a bonus
+      // beyond the hand estimate learned from the user's sample bids.
+      if (trumpCount >= 6 && (trumpHasOne || hasRook) && totalOnes + totalFourteens >= 3) adjustment += 5;
+      if (settings.callPartner && playerCount() === 4 && totalOnes >= 2) adjustment += 5;
+
+      return Math.min(0, adjustment);
+    }
+
     function botBid(player) {
       if (state.phase !== "bidding" || !settings.biddingEnabled || !state.auctionStarted || state.currentBidder !== player) return;
       const nextBid = nextLegalBid();
       const humanIsHighBidder = state.highBidder === 0;
       const profile = aiProfile();
       const estimatedMax = estimateMaxBid(state.hands[player]);
-      let maxBid = estimatedMax + profile.bidBonus - (humanIsHighBidder ? profile.humanLeadPenalty : 0);
+      const simulationAdjustment = simulatedBidRiskAdjustment(state.hands[player]);
+      let maxBid = estimatedMax + simulationAdjustment + profile.bidBonus - (humanIsHighBidder ? profile.humanLeadPenalty : 0);
       maxBid = Math.max(maxBid, botMoonCeiling(player));
 
       if (state.highBidder === null
@@ -5664,7 +5703,7 @@
       flying.addEventListener("transitionend", event => {
         if (event.propertyName === "transform") finish();
       });
-      setTimeout(finish, 520);
+      setTimeout(finish, 350);
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -5755,6 +5794,9 @@
       const winningPlay = state.trick.find(play => play.player === currentWinner);
       const partnerPool = isPartner ? partnerCardPool(protectedLegal) : protectedLegal;
       const winningCards = partnerPool.filter(card => beats(card, winningPlay.card, leadSuit));
+
+      const noPointLastSeatSluff = chooseThreePlayerLastSeatSluff(player, partnerPool, winningPlay.card, leadSuit);
+      if (noPointLastSeatSluff) return noPointLastSeatSluff;
 
       const forcedTrump = choosePartnerTrumpTakeover(player, partnerPool, currentWinner, winningPlay.card, leadSuit);
       if (forcedTrump) return forcedTrump;
@@ -6272,6 +6314,73 @@
         && !opponentsStillHoldTrump(player);
     }
 
+    function shouldReserveTrumpForEndgame(player) {
+      if (!state.trump || state.trump === "none" || opponentsStillHoldTrump(player)) return false;
+      const hand = state.hands[player] || [];
+      const trumps = hand.filter(card => effectiveSuit(card) === state.trump);
+      const sideCards = hand.filter(card => effectiveSuit(card) !== state.trump);
+      return trumps.length > 0 && sideCards.length > 0;
+    }
+
+    function chooseLateMiddleControlLossLead(player, legal) {
+      if (teamOf(player) !== state.bidTeam
+          || !state.trump
+          || state.trump === "none"
+          || opponentsStillHoldTrump(player)) return null;
+
+      const hand = state.hands[player] || [];
+      const trumps = hand.filter(card => effectiveSuit(card) === state.trump);
+      const sideCards = legal.filter(card => effectiveSuit(card) !== state.trump);
+      if (!sideCards.length || !trumps.length) return null;
+
+      const total = totalTricksInHand();
+      const completed = Math.floor(state.cardsPlayed / Math.max(1, playerCount()));
+      const remaining = hand.length;
+      const inLateMiddle = completed >= Math.max(2, Math.floor(total * .4))
+        && completed <= Math.floor(total * .78);
+
+      // With two or three cards left, cash a harmless loser now and preserve the
+      // remaining trump for the last trick whenever possible. That last trick is
+      // worth 20 points plus every counter buried in the kitty.
+      const endgameWindow = remaining <= 3;
+      if (!inLateMiddle && !endgameWindow) return null;
+      if (!endgameWindow && trumps.length < 2) return null;
+
+      const losers = sideCards.filter(card =>
+        cardPoints(card) === 0
+        && !isGuardedFourteen(card)
+        && !wouldStrandFourteen(player, card)
+        && opponentCanBeatLead(player, card)
+      );
+      if (!losers.length) return null;
+
+      return [...losers].sort((a, b) =>
+        sideSuitKeepScore(player, effectiveSuit(a)) - sideSuitKeepScore(player, effectiveSuit(b))
+        || cardRank(a) - cardRank(b)
+      )[0];
+    }
+
+    function chooseThreePlayerLastSeatSluff(player, legal, winningCard, leadSuit) {
+      if (playerCount() !== 3
+          || state.trick.length !== playerCount() - 1) return null;
+
+      const pointsOnTable = state.trick.reduce((sum, play) => sum + cardPoints(play.card), 0);
+      if (pointsOnTable !== 0) return null;
+
+      const losingNonPointers = legal.filter(card =>
+        cardPoints(card) === 0
+        && !beats(card, winningCard, leadSuit)
+        && !isGuardedFourteen(card)
+        && !wouldStrandFourteen(player, card)
+      );
+      if (!losingNonPointers.length) return null;
+
+      // With no counters exposed, save trump/high control for a later trick. This
+      // applies to either side in three-player play; the 14 guard below still
+      // protects a 14 while its 1 remains unseen.
+      return chooseStrategicSluff(player, losingNonPointers, leadSuit);
+    }
+
     function opponentCanBeatLead(player, card) {
       const leadSuit = effectiveSuit(card);
       return playerIndexes().some(opponent => {
@@ -6353,6 +6462,14 @@
 
       let leadPool = [...legal];
 
+      // Once the opposing side has exhausted trump, stop cashing trump just
+      // because it is a sure winner. Preserve it as late-hand insurance and,
+      // whenever possible, for the final trick and kitty points.
+      if (shouldReserveTrumpForEndgame(player)) {
+        const nonTrump = leadPool.filter(card => effectiveSuit(card) !== state.trump);
+        if (nonTrump.length) leadPool = nonTrump;
+      }
+
       // Defenders do not lead trump back to the bidder when another color is
       // available. They also avoid colors the bidder has already shown void in.
       if (avoidTrumpLead && state.trump && state.trump !== "none") {
@@ -6394,6 +6511,12 @@
       // give away the final-trick/kitty points.
       const noTrumpEarlyLoss = chooseNoTrumpEarlyLossLead(player, leadPool);
       if (noTrumpEarlyLoss) return noTrumpEarlyLoss;
+
+      // In a trump hand, once opposing trump is gone, get unavoidable losers out
+      // in the late-middle portion of the hand while retaining trump to regain
+      // control. This is deliberately earlier than the final trick.
+      const lateMiddleLoss = chooseLateMiddleControlLossLead(player, leadPool);
+      if (lateMiddleLoss) return lateMiddleLoss;
 
       // Cash a card only when no opponent can legally beat it, including a
       // possible trump from a player who is void in the led color.

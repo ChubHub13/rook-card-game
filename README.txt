@@ -1,46 +1,25 @@
-ROOK SOLITAIRE — BROWSER GAME
+ROOK SOLITAIRE — v1.1.14
 
-Open index.html in a modern browser. No server, installation, or internet connection is required.
+Open index.html in a modern browser. No server or installation is required. The game also works when hosted as a static site such as GitHub Pages.
 
-Current features
-- Choose 3, 4, or 5 players: one human and the remaining seats controlled by bots.
-- Rotate through every dealt hand before choosing which hand to play.
-- Enter any bid from 100 to 400 and select Take Bid. There is no bot auction.
-- Bitter Bunch throws in every hand and immediately redeals.
+Current highlights
+- 3-, 4-, or 5-player Rook play with configurable Call Partner behavior.
 - 45-card deck: 1 and 5 through 14 in four colors, plus the Rook.
-- The 1 is high. The Rook can rank High Trump, Low Trump, or 10.5.
-- Optional No Trump mode; in No Trump the Rook is a red 10.5.
-- Kitty reveal, trump selection, returned-nest animation, trick animation, sound effects, save/resume, and two visual themes.
-- The Rest Are Mine reveals all remaining cards on the table before scoring.
-- Go Down ends the hand and subtracts the bid without awarding points to the defenders.
-- The default game target is 1000 points and can be changed in Settings.
-
-Deals
-- 3 players: 13 cards each and a 6-card nest.
-- 4 players: 10 cards each and a 5-card nest.
-- 5 players: 8 cards each and a 5-card nest.
-
-Call Partner
-- Enable Call Partner in Settings.
-- After selecting trump and returning the nest, name one card held by another player.
-- The holder of that card becomes the bidder's partner for that hand.
-- The partner remains hidden until the called card is played.
-- When the bidder leads a lower card of the called card's color, the partner plays the called card unless a lower card is certain to win. If the lower card is used, the partner leads the called card back on the next lead.
+- 1 is high. Rook rank can be High Trump, Low Trump, or 10.5.
+- Configurable kitty, trump, No Trump, bidding, AI difficulty, bot speed, sounds, themes, names, stats, and winning score.
+- Running scoring never drops below zero.
+- The last trick is worth 20 points plus the counters in the kitty.
+- Optional bot bidding is calibrated from user-provided reference hands plus offline simulated hands.
+- Bot play includes partner point-feeding, called-card rules, suit/trump memory, guarded 14 behavior, defensive sluffing, and late-hand trump preservation.
+- Once opposing trump is exhausted, bots preserve remaining trump for control and especially the final trick instead of automatically cashing it.
+- Card movement is accelerated in v1.1.14.
 
 Scoring
-- Four-player games without Call Partner use fixed teams: the player across from the user is the partner.
-- Three-player, five-player, and Call Partner games keep individual running totals.
-- In individual-score modes, players on the same temporary hand team receive the same score change for that hand.
-- A bidding side that makes the bid receives its captured points. If set, it loses the bid amount.
-- Defenders receive their captured points unless the bidder uses Go Down.
-- The last-trick team receives the nest and the 20-point last-trick bonus.
-- A 400 bid is a moon bid and requires the bidder personally to win every trick.
-
-Counter values
 - 1 = 15 points
 - 5 = 5 points
 - 10 = 10 points
 - 14 = 10 points
 - Rook = 20 points
-- Last trick = 20 points
-- Total available per hand = 200 points
+- Last trick = 20 bonus points plus the kitty counters
+
+The game saves settings and current progress in browser localStorage.
