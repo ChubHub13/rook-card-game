@@ -23,3 +23,6 @@ Scoring
 - Last trick = 20 bonus points plus the kitty counters
 
 The game saves settings and current progress in browser localStorage.
+
+Development
+- Changes to index.html and README.txt in the local Rook Solitaire project are automatically committed and uploaded to GitHub.
