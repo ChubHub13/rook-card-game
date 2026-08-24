@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.15">v1.1.15</span>
+            <span class="version-badge" title="Version 1.1.16">v1.1.16</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -5737,19 +5737,69 @@
     function botPlay(player) {
       if (state.phase !== "playing" || state.turn !== player || state.animatingPlay) return;
       const rawLegal = legalCards(player);
-      const legal = state.trump && state.trump !== "none" && state.hands[player].length <= 2
-        ? (() => {
-            // Match the three-handed bot: with two cards left, play the
-            // non-trump whenever following-suit rules allow it so the remaining
-            // trump can protect the last trick and the kitty/last-trick bonus.
-            const nonTrump = rawLegal.filter(card => effectiveSuit(card) !== state.trump);
-            return nonTrump.length ? nonTrump : rawLegal;
-          })()
-        : rawLegal;
+      const legal = legalCardsKeepingFinalTrump(player, rawLegal);
       const card = chooseBotCard(player, legal);
       const source = document.querySelector(`#mini${player} .mini-back:last-child`)
         || document.getElementById(`player${player}`);
       animateCardToSlot(player, card, source, () => playCard(player, card.id));
+    }
+
+    function legalCardsKeepingFinalTrump(player, legal) {
+      if (!state.trump || state.trump === "none") return legal;
+
+      const trumps = (state.hands[player] || [])
+        .filter(card => effectiveSuit(card) === state.trump);
+      if (trumps.length !== 1) return legal;
+
+      const finalTrump = trumps[0];
+      if (!legal.some(card => card.id === finalTrump.id)) return legal;
+
+      const nonTrump = legal.filter(card => effectiveSuit(card) !== state.trump);
+      if (!nonTrump.length) return legal;
+
+      // A called partner who owes the called-card lead must still honor that
+      // rule, even when the called card is their final trump.
+      const owesCalledCardLead = !state.trick.length
+        && settings.callPartner
+        && player === state.calledPartner
+        && state.calledCardLeadBack
+        && state.calledCard
+        && finalTrump.id === state.calledCard.id;
+      if (owesCalledCardLead) return legal;
+
+      // Keep one trump in reserve throughout the hand for the final trick and
+      // kitty. Spend it early only when declining to trump a losing trick would
+      // make the bidding side's contract mathematically impossible to reach.
+      return mustSpendFinalTrumpToAvoidSet(player, finalTrump, nonTrump) ? legal : nonTrump;
+    }
+
+    function mustSpendFinalTrumpToAvoidSet(player, finalTrump, nonTrump) {
+      if (teamOf(player) !== state.bidTeam || !state.trick.length || !state.highBid) return false;
+
+      const currentWinner = trickWinner(state.trick);
+      if (teamOf(currentWinner) === state.bidTeam) return false;
+
+      const leadSuit = effectiveSuit(state.trick[0].card);
+      const winningPlay = state.trick.find(play => play.player === currentWinner);
+      if (!winningPlay || !beats(finalTrump, winningPlay.card, leadSuit)) return false;
+
+      // If a side-suit card can already take the trick, the last trump is not
+      // needed. Otherwise use the cheapest legal discard to judge whether
+      // conceding this trick crosses the point-of-no-return for the contract.
+      if (nonTrump.some(card => beats(card, winningPlay.card, leadSuit))) return false;
+      if (state.shootMoon) return true;
+
+      const defendingTeam = state.bidTeam === 0 ? 1 : 0;
+      const capturedByDefenders = (state.captured[defendingTeam] || [])
+        .reduce((sum, card) => sum + cardPoints(card), 0);
+      const pointsOnTable = state.trick
+        .reduce((sum, play) => sum + cardPoints(play.card), 0);
+      const cheapestDiscard = Math.min(...nonTrump.map(card => cardPoints(card)));
+
+      // The deck contains 200 counter points; the bidding side could still earn
+      // the separate 20-point last-trick bonus. More than 200 - bid in defender
+      // counters therefore means the bid cannot be saved later.
+      return capturedByDefenders + pointsOnTable + cheapestDiscard > 200 - state.highBid;
     }
 
     function animateCardToSlot(player, card, sourceElement, callback) {
