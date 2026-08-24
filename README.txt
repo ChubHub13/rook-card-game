@@ -1,4 +1,4 @@
-ROOK SOLITAIRE — v1.1.14
+ROOK SOLITAIRE — v1.1.15
 
 Open index.html in a modern browser. No server or installation is required. The game also works when hosted as a static site such as GitHub Pages.
 
@@ -12,6 +12,8 @@ Current highlights
 - Optional bot bidding is calibrated from user-provided reference hands plus offline simulated hands.
 - Bot play includes partner point-feeding, called-card rules, suit/trump memory, guarded 14 behavior, defensive sluffing, and late-hand trump preservation.
 - Once opposing trump is exhausted, bots preserve remaining trump for control and especially the final trick instead of automatically cashing it.
+- With two cards left, bots play a legal non-trump first so they can keep trump for the last trick.
+- Bot bidders return the kitty with a strong preference for keeping only two working suits, plus top-run winners in other suits.
 - Card movement is accelerated in v1.1.14.
 
 Scoring

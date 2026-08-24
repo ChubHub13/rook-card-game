@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.14">v1.1.14</span>
+            <span class="version-badge" title="Version 1.1.15">v1.1.15</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -5146,8 +5146,95 @@
     }
 
     function chooseBotDiscards(hand, trump, count) {
-      const sorted = [...hand].sort((a, b) => discardDesirability(a, trump) - discardDesirability(b, trump));
-      return sorted.slice(0, count);
+      const keepCount = Math.max(0, hand.length - count);
+      const winnerIds = botDiscardWinnerIds(hand, trump);
+      const activeSuits = SUITS.filter(suit => hand.some(card => botDiscardSuit(card, trump) === suit));
+      const corePlans = [];
+
+      if (trump && trump !== "none") {
+        const sideSuits = activeSuits.filter(suit => suit !== trump);
+        if (sideSuits.length) sideSuits.forEach(suit => corePlans.push(new Set([trump, suit])));
+        else corePlans.push(new Set([trump]));
+      } else {
+        for (let first = 0; first < activeSuits.length; first++) {
+          for (let second = first + 1; second < activeSuits.length; second++) {
+            corePlans.push(new Set([activeSuits[first], activeSuits[second]]));
+          }
+        }
+        if (!corePlans.length) corePlans.push(new Set(activeSuits.slice(0, 2)));
+      }
+
+      let bestPlan = null;
+      for (const coreSuits of corePlans) {
+        const ranked = [...hand].sort((a, b) => {
+          const scoreDiff = botDiscardKeepScore(b, trump, coreSuits, winnerIds)
+            - botDiscardKeepScore(a, trump, coreSuits, winnerIds);
+          return scoreDiff || cardRank(b) - cardRank(a) || String(a.id).localeCompare(String(b.id));
+        });
+        const kept = ranked.slice(0, keepCount);
+        const keptIds = new Set(kept.map(card => card.id));
+        const discards = hand.filter(card => !keptIds.has(card.id));
+        const offCoreLosers = kept.filter(card =>
+          !coreSuits.has(botDiscardSuit(card, trump)) && !winnerIds.has(card.id)
+        ).length;
+        const structuralSuits = new Set(kept
+          .filter(card => !winnerIds.has(card.id))
+          .map(card => botDiscardSuit(card, trump)));
+        const retainedValue = kept.reduce((sum, card) => sum + discardDesirability(card, trump), 0);
+        const retainedWinners = kept.filter(card => winnerIds.has(card.id)).length;
+        const score = retainedValue
+          + retainedWinners * 180
+          - offCoreLosers * 1000
+          - Math.max(0, structuralSuits.size - 2) * 1200;
+
+        if (!bestPlan || score > bestPlan.score) bestPlan = { score, discards };
+      }
+
+      return (bestPlan?.discards || [...hand]
+        .sort((a, b) => discardDesirability(a, trump) - discardDesirability(b, trump))
+        .slice(0, count));
+    }
+
+    function botDiscardSuit(card, trump) {
+      if (!card.rook) return card.suit;
+      return trump === "none" ? "red" : trump;
+    }
+
+    function botDiscardWinnerIds(hand, trump) {
+      const winners = new Set();
+      const standardOrder = [1, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5];
+
+      for (const suit of SUITS) {
+        const order = trump === "none" && suit === "red"
+          ? [1, 14, 13, 12, 11, "rook", 10, 9, 8, 7, 6, 5]
+          : suit === trump
+            ? settings.rookRank === "high"
+              ? ["rook", ...standardOrder]
+              : settings.rookRank === "low"
+                ? [...standardOrder, "rook"]
+                : [1, 14, 13, 12, 11, "rook", 10, 9, 8, 7, 6, 5]
+            : standardOrder;
+
+        for (const rank of order) {
+          const card = rank === "rook"
+            ? hand.find(item => item.rook && botDiscardSuit(item, trump) === suit)
+            : hand.find(item => !item.rook && item.suit === suit && item.value === rank);
+          if (!card) break;
+          winners.add(card.id);
+        }
+      }
+
+      return winners;
+    }
+
+    function botDiscardKeepScore(card, trump, coreSuits, winnerIds) {
+      const suit = botDiscardSuit(card, trump);
+      let score = discardDesirability(card, trump);
+      if (coreSuits.has(suit)) score += 90;
+      if (trump !== "none" && suit === trump) score += 45;
+      if (winnerIds.has(card.id)) score += 260;
+      if (card.rook) score += 80;
+      return score;
     }
 
     function discardDesirability(card, trump) {
@@ -5649,7 +5736,16 @@
 
     function botPlay(player) {
       if (state.phase !== "playing" || state.turn !== player || state.animatingPlay) return;
-      const legal = legalCards(player);
+      const rawLegal = legalCards(player);
+      const legal = state.trump && state.trump !== "none" && state.hands[player].length <= 2
+        ? (() => {
+            // Match the three-handed bot: with two cards left, play the
+            // non-trump whenever following-suit rules allow it so the remaining
+            // trump can protect the last trick and the kitty/last-trick bonus.
+            const nonTrump = rawLegal.filter(card => effectiveSuit(card) !== state.trump);
+            return nonTrump.length ? nonTrump : rawLegal;
+          })()
+        : rawLegal;
       const card = chooseBotCard(player, legal);
       const source = document.querySelector(`#mini${player} .mini-back:last-child`)
         || document.getElementById(`player${player}`);
