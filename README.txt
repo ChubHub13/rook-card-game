@@ -1,4 +1,4 @@
-ROOK SOLITAIRE — v1.1.16
+ROOK SOLITAIRE — v1.1.17
 
 Open index.html in a modern browser. No server or installation is required. The game also works when hosted as a static site such as GitHub Pages.
 
@@ -14,6 +14,8 @@ Current highlights
 - Once opposing trump is exhausted, bots preserve remaining trump for control and especially the final trick instead of automatically cashing it.
 - Bots protect their final trump throughout the hand for the last trick whenever legally possible. A bidding-side bot spends it early only when taking the current trick is necessary to avoid being mathematically set.
 - Bot bidders return the kitty with a strong preference for keeping only two working suits, plus top-run winners in other suits.
+- In secondary colors, bots prefer returning non-winning 10s and 5s to the kitty so opponents have fewer counters available.
+- After a bot is set twice, it must pass for the next three hands.
 - Card movement is accelerated in v1.1.14.
 
 Scoring

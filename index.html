@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.16">v1.1.16</span>
+            <span class="version-badge" title="Version 1.1.17">v1.1.17</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3467,6 +3467,8 @@
       phase: "idle",
       scores: initialScores(),
       scoreHistory: [],
+      botBidSetCounts: playerIndexes().map(() => 0),
+      botBidBlockedThroughHand: playerIndexes().map(() => 0),
       lastHand: null,
       lastTrick: null,
       handNumber: 0,
@@ -4374,6 +4376,12 @@
       state.phase = "dealing";
       state.scores = keepScores && state.scores.length === scoreEntryCount() ? state.scores : initialScores();
       state.scoreHistory = keepScores ? state.scoreHistory : [];
+      state.botBidSetCounts = keepScores && Array.isArray(state.botBidSetCounts)
+        ? state.botBidSetCounts
+        : playerIndexes().map(() => 0);
+      state.botBidBlockedThroughHand = keepScores && Array.isArray(state.botBidBlockedThroughHand)
+        ? state.botBidBlockedThroughHand
+        : playerIndexes().map(() => 0);
       state.lastHand = keepScores ? state.lastHand : null;
       state.lastTrick = null;
       state.handNumber = keepScores ? state.handNumber : 0;
@@ -4808,6 +4816,14 @@
 
     function botBid(player) {
       if (state.phase !== "bidding" || !settings.biddingEnabled || !state.auctionStarted || state.currentBidder !== player) return;
+      if (botBidIsSuspended(player)) {
+        state.passed[player] = true;
+        state.lastBidByPlayer[player] = "Pass";
+        logMessage(`${playerName(player)} must pass after being set twice and may bid again after hand ${state.botBidBlockedThroughHand[player]}.`);
+        playSound("pass");
+        advanceBidTurn(player);
+        return;
+      }
       const nextBid = nextLegalBid();
       const humanIsHighBidder = state.highBidder === 0;
       const profile = aiProfile();
@@ -4835,6 +4851,34 @@
         playSound("pass");
       }
       advanceBidTurn(player);
+    }
+
+    function normalizeBotBidDiscipline() {
+      state.botBidSetCounts = Array.isArray(state.botBidSetCounts) && state.botBidSetCounts.length === playerCount()
+        ? state.botBidSetCounts.map(value => Math.max(0, Number(value) || 0))
+        : playerIndexes().map(() => 0);
+      state.botBidBlockedThroughHand = Array.isArray(state.botBidBlockedThroughHand) && state.botBidBlockedThroughHand.length === playerCount()
+        ? state.botBidBlockedThroughHand.map(value => Math.max(0, Number(value) || 0))
+        : playerIndexes().map(() => 0);
+    }
+
+    function botBidIsSuspended(player) {
+      if (player === 0) return false;
+      normalizeBotBidDiscipline();
+      return state.handNumber <= state.botBidBlockedThroughHand[player];
+    }
+
+    function recordBotBidResult(player, madeBid) {
+      if (player === null || player === 0) return;
+      normalizeBotBidDiscipline();
+      if (madeBid) return;
+
+      state.botBidSetCounts[player] += 1;
+      if (state.botBidSetCounts[player] < 2) return;
+
+      state.botBidSetCounts[player] = 0;
+      state.botBidBlockedThroughHand[player] = state.handNumber + 3;
+      logMessage(`${playerName(player)} has been set twice and cannot bid for the next three hands.`);
     }
 
     function estimateMaxBid(hand, randomize = true) {
@@ -5234,6 +5278,14 @@
       if (trump !== "none" && suit === trump) score += 45;
       if (winnerIds.has(card.id)) score += 260;
       if (card.rook) score += 80;
+      // Counters in a secondary or tertiary color are safer in the kitty than
+      // exposed to the defenders. Keep a top-run winner, but otherwise prefer
+      // returning side-suit 10s and 5s over zero-point cards in that color.
+      if (trump !== "none"
+          && suit !== trump
+          && !winnerIds.has(card.id)
+          && !card.rook
+          && (card.value === 10 || card.value === 5)) score -= 65;
       return score;
     }
 
@@ -6931,6 +6983,7 @@
         madeBid,
         wentDown: false
       };
+      recordBotBidResult(state.highBidder, madeBid);
       state.lastHand = completedHand;
       state.scoreHistory.push(completedHand);
       recordOverallHand(completedHand);
