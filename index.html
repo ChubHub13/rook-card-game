@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.17">v1.1.17</span>
+            <span class="version-badge" title="Version 1.1.18">v1.1.18</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -5234,9 +5234,37 @@
         if (!bestPlan || score > bestPlan.score) bestPlan = { score, discards };
       }
 
-      return (bestPlan?.discards || [...hand]
+      const discards = bestPlan?.discards || [...hand]
         .sort((a, b) => discardDesirability(a, trump) - discardDesirability(b, trump))
-        .slice(0, count));
+        .slice(0, count);
+      return avoidBadSingletonKeeps(hand, discards, trump);
+    }
+
+    function avoidBadSingletonKeeps(hand, discards, trump) {
+      const result = [...discards];
+      const discardIds = new Set(result.map(card => card.id));
+      const kept = () => hand.filter(card => !discardIds.has(card.id));
+
+      for (const suit of SUITS) {
+        if (suit === trump) continue;
+        const suitKept = kept().filter(card => botDiscardSuit(card, trump) === suit);
+        if (suitKept.length !== 1 || suitKept[0].rook || ![10, 14].includes(suitKept[0].value)) continue;
+
+        const badKeep = suitKept[0];
+        let replacement = result.find(card =>
+          botDiscardSuit(card, trump) === suit && !card.rook && ![10, 14].includes(card.value)
+        );
+        if (!replacement) {
+          const populated = new Set(kept().map(card => botDiscardSuit(card, trump)));
+          replacement = result.find(card => populated.has(botDiscardSuit(card, trump)));
+        }
+        if (!replacement) continue;
+
+        result[result.findIndex(card => card.id === replacement.id)] = badKeep;
+        discardIds.delete(replacement.id);
+        discardIds.add(badKeep.id);
+      }
+      return result;
     }
 
     function botDiscardSuit(card, trump) {
@@ -5788,6 +5816,10 @@
 
     function botPlay(player) {
       if (state.phase !== "playing" || state.turn !== player || state.animatingPlay) return;
+      if (canClaimRest(player)) {
+        claimRest(player);
+        return;
+      }
       const rawLegal = legalCards(player);
       const legal = legalCardsKeepingFinalTrump(player, rawLegal);
       const card = chooseBotCard(player, legal);
@@ -5992,6 +6024,18 @@
       const winningPlay = state.trick.find(play => play.player === currentWinner);
       const partnerPool = isPartner ? partnerCardPool(protectedLegal) : protectedLegal;
       const winningCards = partnerPool.filter(card => beats(card, winningPlay.card, leadSuit));
+
+      // When void, trump in to regain the lead before cashing established
+      // side-suit winners. The final-trump guard has already filtered `legal`.
+      if (!sameSideWinning) {
+        const hasSideWinner = state.hands[player].some(card =>
+          effectiveSuit(card) !== state.trump && !opponentCanBeatLead(player, card)
+        );
+        const trumpsThatWin = partnerPool.filter(card =>
+          effectiveSuit(card) === state.trump && beats(card, winningPlay.card, leadSuit)
+        );
+        if (hasSideWinner && trumpsThatWin.length) return lowestWinningCard(trumpsThatWin);
+      }
 
       const noPointLastSeatSluff = chooseThreePlayerLastSeatSluff(player, partnerPool, winningPlay.card, leadSuit);
       if (noPointLastSeatSluff) return noPointLastSeatSluff;
@@ -6220,6 +6264,15 @@
     function chooseStrategicSluff(player, cards, leadSuit = null) {
       let pool = [...cards];
       if (!pool.length) return null;
+
+      // Do not donate counters or established winners when an expendable card
+      // is available. A 1 is always treated as a winner/control card here.
+      const nonPoints = pool.filter(card => cardPoints(card) === 0);
+      if (nonPoints.length) pool = nonPoints;
+      const nonWinners = pool.filter(card =>
+        !(!card.rook && card.value === 1) && opponentCanBeatLead(player, card)
+      );
+      if (nonWinners.length) pool = nonWinners;
 
       if (defenderAgainstBidder(player)) {
         // If the bot is void in the led color, keep trump for taking tricks rather
@@ -6782,21 +6835,21 @@
       )[0];
     }
 
-    function canClaimRest() {
+    function canClaimRest(player = 0) {
       if (state.phase !== "playing"
-          || state.highBidder !== 0
-          || state.turn !== 0
+          || state.highBidder !== player
+          || state.turn !== player
           || state.trick.length !== 0
-          || state.hands[0].length === 0) return false;
+          || state.hands[player].length === 0) return false;
 
       // This is intentionally stricter than normal claim logic. Every other
       // player is treated as a possible threat, including a fixed or called
       // partner. The button appears only when the bidder can lead the strongest
       // remaining card each time and no legal response can ever win a trick.
-      const bidderHand = state.hands[0].map(card => ({ ...card }));
+      const bidderHand = state.hands[player].map(card => ({ ...card }));
       const otherHands = playerIndexes()
-        .filter(player => player !== 0)
-        .map(player => state.hands[player].map(card => ({ ...card })));
+        .filter(other => other !== player)
+        .map(other => state.hands[other].map(card => ({ ...card })));
 
       const removeCard = (hand, card) => {
         const index = hand.findIndex(item => item.id === card.id);
@@ -6838,11 +6891,11 @@
       return true;
     }
 
-    function claimRest() {
-      if (!canClaimRest()) return;
+    function claimRest(player = 0) {
+      if (!canClaimRest(player)) return;
       clearTimeout(botTimer);
       botTimer = null;
-      resolveClaimRest(state.hands.map(hand => hand.map(card => ({ ...card }))));
+      resolveClaimRest(state.hands.map(hand => hand.map(card => ({ ...card }))), player);
     }
 
     function renderClaimReveal() {
@@ -6865,15 +6918,16 @@
       `;
     }
 
-    function resolveClaimRest(revealedHands) {
-      const remainingTricks = state.hands[0].length;
+    function resolveClaimRest(revealedHands, claimant = 0) {
+      const remainingTricks = state.hands[claimant].length;
       const remaining = state.hands.flatMap(hand => hand.splice(0));
-      state.tricksWon[0] += remainingTricks;
-      state.tricksWonByPlayer[0] += remainingTricks;
-      state.captured[0].push(...remaining);
-      state.lastTrickWinner = 0;
+      const claimantTeam = teamOf(claimant);
+      state.tricksWon[claimantTeam] += remainingTricks;
+      state.tricksWonByPlayer[claimant] += remainingTricks;
+      state.captured[claimantTeam].push(...remaining);
+      state.lastTrickWinner = claimant;
       state.trick = [];
-      logMessage(`${playerName(0)} claims all remaining tricks.`);
+      logMessage(`${playerName(claimant)} claims all remaining tricks.`);
       scoreHand(revealedHands);
     }
 
