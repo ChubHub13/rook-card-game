@@ -6892,6 +6892,7 @@
     }
 
     function claimRest(player = 0) {
+      if (!Number.isInteger(player)) player = 0;
       if (!canClaimRest(player)) return;
       clearTimeout(botTimer);
       botTimer = null;
