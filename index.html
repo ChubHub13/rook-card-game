@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.19">v1.1.19</span>
+            <span class="version-badge" title="Version 1.1.20">v1.1.20</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -5087,6 +5087,7 @@
       state.hands[player].push(...state.nest);
       state.nest = [];
       state.trump = chooseBestTrump(state.hands[player]);
+      state.hands.forEach(sortHand);
       const discards = chooseBotDiscards(state.hands[player], state.trump, discardCount());
       const discardIds = new Set(discards.map(card => card.id));
       state.nest = state.hands[player].filter(card => discardIds.has(card.id));
