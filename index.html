@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.18">v1.1.18</span>
+            <span class="version-badge" title="Version 1.1.19">v1.1.19</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -4868,12 +4868,14 @@
       return state.handNumber <= state.botBidBlockedThroughHand[player];
     }
 
-    function recordBotBidResult(player, madeBid) {
+    function recordBotBidResult(player, madeBid, bidderPoints = 0) {
       if (player === null || player === 0) return;
       normalizeBotBidDiscipline();
       if (madeBid) return;
 
-      state.botBidSetCounts[player] += 1;
+      const deficit = Math.max(0, state.highBid - (Number(bidderPoints) || 0));
+      const strikes = deficit > 40 ? 2 : 1;
+      state.botBidSetCounts[player] += strikes;
       if (state.botBidSetCounts[player] < 2) return;
 
       state.botBidSetCounts[player] = 0;
@@ -5996,12 +5998,19 @@
       if (exposedFourteen) return exposedFourteen;
 
       const calledCardProtected = protectCalledPartnerCard(player, legal);
-      const protectedLegal = protectUncoveredFourteens(calledCardProtected);
+      let protectedLegal = protectUncoveredFourteens(calledCardProtected);
+      if (!state.trick.length && protectedLegal.some(card => cardPoints(card) === 0)) {
+        const withoutTens = protectedLegal.filter(card => card.rook || card.value !== 10);
+        if (withoutTens.length) protectedLegal = withoutTens;
+      }
 
       if (state.shootMoon && player === state.highBidder) return chooseMoonBidderCard(player, protectedLegal);
       if (state.shootMoon && teamOf(player) === state.bidTeam && player !== state.highBidder) {
         return chooseMoonPartnerCard(player, protectedLegal);
       }
+
+      const secondSeatPoints = chooseSecondSeatBidderPointFeed(player, protectedLegal);
+      if (secondSeatPoints) return secondSeatPoints;
 
       const rookCapture = chooseRookCapture(player, protectedLegal);
       if (rookCapture) return rookCapture;
@@ -6193,6 +6202,18 @@
       // Point-feeding cards are limited to the Rook, 10s, and 5s.
       // Never classify a 1 or 14 as a card to throw to a partner.
       return Boolean(card && (card.rook || card.value === 10 || card.value === 5));
+    }
+
+    function chooseSecondSeatBidderPointFeed(player, legal) {
+      if (state.trick.length !== 1 || state.trick[0].player !== state.highBidder || state.trick[0].card.rook) return null;
+      const leadCard = state.trick[0].card;
+      const leadSuit = effectiveSuit(leadCard);
+      const remainingInColor = state.hands.flat().filter(card => effectiveSuit(card) === leadSuit);
+      const higherCards = remainingInColor.filter(card => cardRank(card) > cardRank(leadCard));
+      if (!higherCards.length) return null;
+      const highestRank = Math.max(...remainingInColor.map(cardRank));
+      if (state.hands[player].some(card => effectiveSuit(card) === leadSuit && cardRank(card) === highestRank)) return null;
+      return bestPointThrow(legal.filter(isThrowablePointCard));
     }
 
     function bestPointThrow(cards) {
@@ -7038,7 +7059,7 @@
         madeBid,
         wentDown: false
       };
-      recordBotBidResult(state.highBidder, madeBid);
+      recordBotBidResult(state.highBidder, madeBid, handPoints[state.bidTeam]);
       state.lastHand = completedHand;
       state.scoreHistory.push(completedHand);
       recordOverallHand(completedHand);
