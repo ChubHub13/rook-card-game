@@ -3233,7 +3233,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.20">v1.1.20</span>
+            <span class="version-badge" title="Version 1.1.21">v1.1.21</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -6145,15 +6145,9 @@
       if (!leadSuit || cardRank(lead.card) >= 14 || cardHasBeenPlayed(leadSuit, 1)) return null;
 
       const suitCards = state.hands[player].filter(card => effectiveSuit(card) === leadSuit);
-      if (suitCards.length !== 2) return null;
+      if (suitCards.length < 2) return null;
       const fourteen = suitCards.find(card => !card.rook && card.value === 14);
       if (!fourteen || !legal.some(card => card.id === fourteen.id)) return null;
-
-      const currentWinner = trickWinner(state.trick);
-      if (teamOf(currentWinner) === teamOf(player)) return null;
-      const winningPlay = state.trick.find(play => play.player === currentWinner);
-      if (!winningPlay || !beats(fourteen, winningPlay.card, leadSuit)) return null;
-
       return fourteen;
     }
 
