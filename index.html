@@ -3252,7 +3252,7 @@
         <div class="brand-copy">
           <div class="brand-title-row">
             <h1 id="reloadTitle" role="button" tabindex="0" aria-label="Reload Rook Solitaire" title="Reload game">ROOK SOLITAIRE</h1>
-            <span class="version-badge" title="Version 1.1.23">v1.1.23</span>
+            <span class="version-badge" title="Version 1.1.24">v1.1.24</span>
           </div>
           <p>Choose the hand you want to play</p>
         </div>
@@ -3450,11 +3450,11 @@
     };
 
     const AI_PROFILES = {
-      easy: { bidBonus: -15, humanLeadPenalty: 30, openChance: .25, mistakeChance: .24, jitter: 16 },
-      normal: { bidBonus: -5, humanLeadPenalty: 20, openChance: .50, mistakeChance: .05, jitter: 9 },
+      easy: { bidBonus: -15, humanLeadPenalty: 0, openChance: .25, mistakeChance: .24, jitter: 16 },
+      normal: { bidBonus: -5, humanLeadPenalty: 0, openChance: .50, mistakeChance: .05, jitter: 9 },
       // Hard should play cards better, not simply bid more aggressively. A 100-hand
       // calibration run showed the old +10 bonus produced too many set bids.
-      hard: { bidBonus: 0, humanLeadPenalty: 18, openChance: .62, mistakeChance: 0, jitter: 4 }
+      hard: { bidBonus: 0, humanLeadPenalty: 0, openChance: .62, mistakeChance: 0, jitter: 4 }
     };
 
     const BOT_SPEEDS = {
@@ -4848,7 +4848,10 @@
       const profile = aiProfile();
       const estimatedMax = estimateMaxBid(state.hands[player]);
       const simulationAdjustment = simulatedBidRiskAdjustment(state.hands[player]);
-      let maxBid = estimatedMax + simulationAdjustment + profile.bidBonus - (humanIsHighBidder ? profile.humanLeadPenalty : 0);
+      // Do not punish bots simply because the human made the opening bid.
+      // A solid hand should be willing to contest a minimum opening bid.
+      const minimumOpeningContestBonus = humanIsHighBidder && state.highBid === settings.bidStart ? 10 : 0;
+      let maxBid = estimatedMax + simulationAdjustment + profile.bidBonus + minimumOpeningContestBonus;
       maxBid = Math.max(maxBid, botMoonCeiling(player));
 
       if (state.highBidder === null
